@@ -16,6 +16,7 @@
 #include "spiffy.h"
 #include "bt_parse.h"
 #include "input_buffer.h"
+#include "peer.h"
 
 void peer_run(bt_config_t *config);
 
@@ -46,13 +47,12 @@ int main(int argc, char **argv) {
 
 
 void process_inbound_udp(int sock) {
-  #define BUFLEN 1500
   struct sockaddr_in from;
   socklen_t fromlen;
-  char buf[BUFLEN];
+  char buf[PACKETLEN];
 
   fromlen = sizeof(from);
-  spiffy_recvfrom(sock, buf, BUFLEN, 0, (struct sockaddr *) &from, &fromlen);
+  spiffy_recvfrom(sock, buf, PACKETLEN, 0, (struct sockaddr *) &from, &fromlen);
 
   printf("PROCESS_INBOUND_UDP SKELETON -- replace!\n"
 	 "Incoming message from %s:%d\n%s\n\n", 
@@ -61,9 +61,60 @@ void process_inbound_udp(int sock) {
 	 buf);
 }
 
+void create_whohas_packet(data_packet_t *packet, int num_chunks, 
+  char *chunks[]) {
+
+  memset(packet, 0, sizeof(*packet));
+
+  // Create the WHOHAS header
+  header_t *header = &packet->header;
+  header->magicnum = MAGICNUM;
+  header->version = VERSIONNUM;
+  header->packet_type = WHOHAS_TYPE;
+  header->header_len = sizeof(header);
+
+  // Calculate the packet length
+  // Use num_chunks + 1 to include padding and chunk count at start
+  int packet_len = sizeof(header) + CHK_COUNT + PADDING \
+    + num_chunks * CHK_HASHLEN;
+  if (packet_len > PACKETLEN) {
+    perror("Something went wrong: constructed WHOHAS packet is longer than the \
+maximum possible length.");
+    exit(1);
+  }
+  header->packet_len = packet_len;
+
+  // Create the payload
+  packet->data[0] = num_chunks;
+  // Get start of chunks in payload
+  int inc = CHK_COUNT + PADDING;
+  for (int i = 0; i < num_chunks; i++) {
+    strncpy(packet->data + inc, chunks[i], CHK_HASHLEN);
+    inc += CHK_HASHLEN;
+    if (inc >= DATALEN) {
+      perror("There are too many chunks to fit in the payload for WHOHAS packet.");
+      exit(1);
+    }
+  }
+}
+
+
+
 void process_get(char *chunkfile, char *outputfile) {
   printf("PROCESS GET SKELETON CODE CALLED.  Fill me in!  (%s, %s)\n", 
 	chunkfile, outputfile);
+  // Send request to each client on the network to request the file chunks
+  // Iterate through nodes and request chunk from each
+  //servaddr.sin_family = AF_INET; 
+  //servaddr.sin_port = htons(PORT); 
+  //servaddr.sin_addr.s_addr = INADDR_ANY; 
+
+  // Function to divide chunk list into correct number of packets
+  // Two loops to iterate through clients and chunk list
+
+  //create_whohas_packet(data_packet_t *packet, int num_chunks, 
+  //  char *chunks[]);
+  //sentto(sockfd, MSG, MSG_LEN, MSG_CONFIRM, (const struct sockaddr *) &);
 }
 
 void handle_user_input(char *line, void *cbdata) {
@@ -78,7 +129,6 @@ void handle_user_input(char *line, void *cbdata) {
     }
   }
 }
-
 
 void peer_run(bt_config_t *config) {
   int sock;
@@ -95,7 +145,7 @@ void peer_run(bt_config_t *config) {
     perror("peer_run could not create socket");
     exit(-1);
   }
-  
+    
   bzero(&myaddr, sizeof(myaddr));
   myaddr.sin_family = AF_INET;
   myaddr.sin_addr.s_addr = htonl(INADDR_ANY);

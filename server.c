@@ -6,25 +6,7 @@
 #include <stdio.h>
 
 #include "spiffy.h"
-
-#define PACKETLEN 1500
-#define BUFLEN 100
-
-typedef struct header_s {
-  short magicnum;
-  char version;
-  char packet_type;
-  short header_len;
-  short packet_len; 
-  u_int seq_num;
-  u_int ack_num;
-} header_t;  
-
-typedef struct data_packet {
-  header_t header;
-  char data[BUFLEN];
-} data_packet_t;
-
+#include "peer.h"
 
 int main(int argc, char **argv) {
   struct sockaddr_in addr, from;
