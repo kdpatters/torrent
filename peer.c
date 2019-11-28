@@ -126,23 +126,65 @@ int parse_chunkfile(char *chunkfile, chunk_hash_t *chunklist) {
   return n_chunks;
 }
 
- void iHave_check (data_packet_t *packet, bt_config_t *config) {
+void helper_createPack(data_packet_t *packet, header_t *header, int num_chunks, 
+  char chunks[][CHK_HASHLEN + 1]) {
+
+  // Calculate the packet length
+  // Use num_chunks + 1 to include padding and chunk count at start
+  int packet_len = sizeof(header) + CHK_COUNT + PADDING \
+    + num_chunks * CHK_HASHLEN;
+  if (packet_len > PACKETLEN) {
+    perror("Something went wrong: constructed packet is longer than the \
+    maximum possible length.");
+    exit(1);
+  }
+  header->packet_len = packet_len;
+
+  // Create the payload
+  packet->data[0] = num_chunks;
+  // Get start of chunks in payload
+  
+  int inc = CHK_COUNT + PADDING;
+  for (int i = 0; i < num_chunks; i++) {
+    strncpy(packet->data + inc, chunks[i], CHK_HASHLEN);
+    inc += CHK_HASHLEN;
+    if (inc >= DATALEN) {
+      fprintf(stderr, "There are too many chunks to fit in the payload for packet.");
+      exit(1);
+    }
+  }
+}
+
+
+void create_iHave_packet(data_packet_t *hav_packet, int hav_num_chunks, char chunks[][CHK_HASHLEN + 1]) {
+   memset(hav_packet, 0, sizeof(*hav_packet));
+
+   //Create IHAVE header
+   header_t *hav_header = &hav_packet->header;
+   hav_header->magicnum = MAGICNUM;
+   hav_header->version = VERSIONNUM;
+   hav_header->header_len = sizeof(hav_header);
+   hav_header->packet_type = IHAVE_TYPE;
+
+   helper_createPack(hav_packet, hav_header, hav_num_chunks, chunks);
+} 
+
+void iHave_check (data_packet_t *packet, bt_config_t *config) {
 
     chunk_hash_t *chunklist = NULL;
     int n_chunks = parse_chunkfile(config->has_chunk_file, chunklist); //num of chunks in has_chunk_file
     chunk_hash_t *curr_ch = chunklist;
 
-    char *curr_pack_ch = packet->data[0]; //pointer to start of packet chunk
+    char *curr_pack_ch = packet->data; //pointer to start of packet chunk
     int num_chunks = *curr_pack_ch; //dereference to get stored number of chunks in packet
 
     curr_pack_ch += PADDING + CHK_COUNT; //get to the start of chunk of hashes
     /* char hashes[num_chunks][CHK_HASHLEN]; //to store matching hashes
     memset(hashes, 0, sizeof(hashes)); */
-    char matched[CHK_HASHLEN * MAX_CHK_HASHES];
+    char matched[MAX_CHK_HASHES][CHK_HASHLEN + 1];
     int m_point = 0;
 
     data_packet_t newpack; 
-    header_t *new_header;
 
     for(int i = 0; i < num_chunks; i++) { //for each chunk in packet
       for(int j = 0; j < n_chunks; j++) { //each chunk in has_chunk_file
@@ -151,10 +193,10 @@ int parse_chunkfile(char *chunkfile, chunk_hash_t *chunklist) {
         strncpy(compare, curr_pack_ch + i * CHK_HASHLEN, CHK_HASHLEN);
 
         if (strcmp(compare, curr_ch->hash) == 0) {
-          strncpy(&matched[m_point++], compare, sizeof(compare));
+          strncpy(matched[m_point++], compare, sizeof(compare));
 
           if(m_point >= sizeof(matched)) {
-            create_iHave_packet(newpack, new_header, m_point, matched); //create iHave packet
+            create_iHave_packet(&newpack, m_point, matched); //create iHave packet
             memset(matched, 0, sizeof(matched)); //clearing array of strings
             m_point = 0; //set mno. of matches to 0 for the next packet
           }
@@ -185,38 +227,8 @@ int parse_chunkfile(char *chunkfile, chunk_hash_t *chunklist) {
    iHave_check(curr, config);
 } 
 
-
-void helper_createPack(data_packet_t *packet, header_t *header, int num_chunks, 
-  char *chunks[]) {
-
-  // Calculate the packet length
-  // Use num_chunks + 1 to include padding and chunk count at start
-  int packet_len = sizeof(header) + CHK_COUNT + PADDING \
-    + num_chunks * CHK_HASHLEN;
-  if (packet_len > PACKETLEN) {
-    perror("Something went wrong: constructed packet is longer than the \
-    maximum possible length.");
-    exit(1);
-  }
-  header->packet_len = packet_len;
-
-  // Create the payload
-  packet->data[0] = num_chunks;
-  // Get start of chunks in payload
-  char *curr_chunk = chunks;
-  int inc = CHK_COUNT + PADDING;
-  for (int i = 0; i < num_chunks; i++) {
-    strncpy(packet->data + inc, curr_chunk[i], CHK_HASHLEN);
-    inc += CHK_HASHLEN;
-    if (inc >= DATALEN) {
-      fprintf(stderr, "There are too many chunks to fit in the payload for packet.");
-      exit(1);
-    }
-  }
-}
-
 void create_whohas_packet(data_packet_t *packet, int num_chunks, 
-  char *chunks[]) {
+  char chunks[][CHK_HASHLEN + 1]) {
 
   memset(packet, 0, sizeof(*packet));
 
@@ -230,20 +242,6 @@ void create_whohas_packet(data_packet_t *packet, int num_chunks,
   helper_createPack(packet, header, num_chunks, chunks);
 
 }
-
-void create_iHave_packet(data_packet_t *hav_packet, int hav_num_chunks, char *chunks[]) {
-   memset(hav_packet, 0, sizeof(*hav_packet));
-
-   //Create IHAVE header
-   header_t *hav_header = &hav_packet->header;
-   hav_header->magicnum = MAGICNUM;
-   hav_header->version = VERSIONNUM;
-   hav_header->header_len = sizeof(hav_header);
-   hav_header->packet_type = IHAVE_TYPE;
-
-   helper_createPack(hav_packet, hav_header, hav_num_chunks, chunks);
-} 
-
 
 void process_get(char *chunkfile, char *outputfile, bt_config_t *config) {
   // Parse the chunkfile
@@ -273,7 +271,7 @@ void process_get(char *chunkfile, char *outputfile, bt_config_t *config) {
   for (int i = 0; i < sizeof(*packetlist); i++) {
     create_whohas_packet(&packetlist[i], 
       MIN(MAX_CHK_HASHES, num_chunks), 
-      &chunklist[i * MAX_CHK_HASHES]);
+      &hashes[i * MAX_CHK_HASHES]);
   }
 
   // Create the socket
