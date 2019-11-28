@@ -25,6 +25,7 @@ extern unsigned int debug;
 #define DEBUG_ERRS      0x01    // DBTEXT:  Verbose error reporting
 #define DEBUG_INIT      0x02    // DBTEXT:  Debug initialization
 #define DEBUG_SOCKETS   0x04    // DBTEXT:  Debug socket operations
+#define DEBUG_COMMANDS  0x06    // DBTEXT:  Debug commands (e.g. GET)
 #define DEBUG_PROCESSES 0x08    // DBTEXT:  Debug processes (fork/reap/etc)
 #define DEBUG_SPIFFY    0x10    // DBTEXT:  Debug the spiffy sending code
 

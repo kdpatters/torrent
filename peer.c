@@ -72,6 +72,7 @@ void create_whohas_packet(data_packet_t *packet, int num_chunks,
   // Create the WHOHAS header
   header_t *header = &packet->header;
   header->magicnum = MAGICNUM;
+
   header->version = VERSIONNUM;
   header->packet_type = WHOHAS_TYPE;
   header->header_len = sizeof(header);
@@ -97,7 +98,7 @@ maximum possible length.");
     curr_chunk = curr_chunk->next; // Move on to next chunk hash
     inc += CHK_HASHLEN;
     if (inc >= DATALEN) {
-      fprintf(stderr, "There are too many chunks to fit in the payload for WHOHAS packet.");
+      fprintf(stderr, "There are too many chunks to fit in the payload for WHOHAS packet.\n");
       exit(1);
     }
   }
@@ -111,43 +112,68 @@ int parse_chunkfile(char *chunkfile, chunk_hash_t *chunklist) {
   FILE *f;
   f = fopen(chunkfile, "r");
   if (f == NULL) {
-    fprintf(stderr, "Could not read chunkfile \"%s\".", chunkfile);
+    fprintf(stderr, "Could not read chunkfile \"%s\".\n", chunkfile);
     exit(1);
   }
 
   // Store data for individual chunk has
-  int *id = NULL;
+  int id;
   char hash[CHK_HASHLEN];
 
   // Zero out the chunklist
-  memset(chunklist, 0, sizeof(*chunklist));
   chunk_hash_t *curr = chunklist;
 
-  char *buf = malloc(MAX_LINE);
+  int buf_size = MAX_LINE;
+  char *buf = malloc(buf_size + 1);
   // Read a line from the chunklist file
-  while (getline(&buf, (size_t *) sizeof(buf), f) > 0) {
+  while (getline(&buf, (size_t *) &buf_size, f) > 0) {
     if (strlen(buf) < CHK_HASHLEN + strlen("0 ")) {
-      fprintf(stderr, "Line \"%s\" in chunkfile \"%s\" was too short and could not be parsed.", 
+      fprintf(stderr, "Line \"%s\" in chunkfile \"%s\" was too short and could not be parsed.\n", 
         buf, chunkfile);
     }
     // Attempt to parse ID and hash from current line in file
     else {
-      if (sscanf(buf, "%d %s\n", id, hash) < 2) {
-        fprintf(stderr, "Could not parse both id and hash from line \"%s\" in chunkfile \"%s\".", 
+      buf[strcspn(buf, "\n")] = '\0'; 
+      int offset = strcspn(buf, " ");
+
+      // Parse ID
+      char num[offset];
+      strncpy(num, buf + offset - 1, sizeof(num));
+      num[offset++] = '\0';
+      id = atoi(num);
+
+      // Parse the hash
+      offset += strspn(buf + offset, " ");
+
+      if (offset >= buf_size) {
+        fprintf(stderr, "Could not parse both id and hash from line \"%s\" in chunkfile \"%s\".\n", 
           buf, chunkfile);
       }
-      else if (strlen(hash) != CHK_HASHLEN) {
-        fprintf(stderr, "Expect hash \"%s\" to be of length %d.", hash, CHK_HASHLEN);
+      else {
+        // Read the hash from the buffer
+        strcpy(hash, buf + offset);
+      }
+
+      if (strlen(hash) != CHK_HASHLEN) {
+        fprintf(stderr, "Expected hash \"%s\" to be of length %d.\n", hash, CHK_HASHLEN);
       }
       // Found correct number of arguments and of correct lengths, so allocate
       // a new node 
       else {
-        curr = (chunk_hash_t *) malloc(sizeof(chunk_hash_t));
-        assert(curr != NULL);
-        memset(curr, 0, sizeof(*curr)); // Zero out the memory
-        strcpy(curr->hash, hash);
-        curr->id = *id;
-        curr = curr->next;
+        chunk_hash_t *new_node;
+        new_node = malloc(sizeof(chunk_hash_t));
+        assert(new_node!= NULL);
+        memset(new_node, 0, sizeof(*new_node)); // Zero out the memory
+        strncpy(new_node->hash, hash, CHK_HASHLEN);
+        new_node->id = id;
+
+        if (curr == NULL) {
+          curr = new_node;
+        }
+        else {
+          curr->next = new_node;
+          curr = curr->next;
+        }
         n_chunks++;
       }
     }
@@ -162,13 +188,14 @@ void process_get(char *chunkfile, char *outputfile, bt_config_t *config) {
   int num_chunks = parse_chunkfile(chunkfile, chunklist);
 
   // Create an array of packets to store the chunk hashes
-  data_packet_t *packetlist[(int) ceill((double) num_chunks / 
-    (double) MAX_CHK_HASHES)];
-  memset(packetlist, 0, sizeof(*packetlist)); // Zero out packetlist memory
+  int list_size = (num_chunks / MAX_CHK_HASHES) + \
+    ((num_chunks % MAX_CHK_HASHES) != 0);
+  data_packet_t packetlist[list_size];
+  memset(&packetlist, 0, sizeof(packetlist)); // Zero out packetlist memory
 
   // Package the chunks into packets
-  for (int i = 0; i < sizeof(packetlist); i++) {
-    create_whohas_packet(packetlist[i], 
+  for (int i = 0; i < sizeof(*packetlist); i++) {
+    create_whohas_packet(&packetlist[i], 
       MIN(MAX_CHK_HASHES, num_chunks), 
       &chunklist[i * MAX_CHK_HASHES]);
   }
@@ -185,11 +212,10 @@ void process_get(char *chunkfile, char *outputfile, bt_config_t *config) {
   for (p = config->peers; p != NULL; p = p->next) {
     // Iterate through packets, sending each to given peer
     for (int i = 0; i < sizeof(packetlist); i++) {
-      sendto(sockfd, packetlist[i], packetlist[i]->header.packet_len, 0, 
+      sendto(sockfd, &packetlist[i], packetlist[i].header.packet_len, 0, 
         (const struct sockaddr *) &p->addr, sizeof(p->addr));
     }
   }
-  //
 }
 
 void handle_user_input(char *line, void *cbdata) {
