@@ -46,7 +46,8 @@ int main(int argc, char **argv) {
 }
 
 
-void process_inbound_udp(int sock) {
+void process_inbound_udp(int sock, bt_config_t *config) {
+ // data_packet_t curr*;
   struct sockaddr_in from;
   socklen_t fromlen;
   char buf[PACKETLEN];
@@ -59,27 +60,33 @@ void process_inbound_udp(int sock) {
 	 inet_ntoa(from.sin_addr),
 	 ntohs(from.sin_port),
 	 buf);
+
+   //curr = (data_packet_t)buf;
+   //iHave_check(buf, config);
 }
 
-void create_whohas_packet(data_packet_t *packet, int num_chunks, 
+/* void iHave_check(data_packet_t *packet, bt_config_t config) {
+   void *curr_chunk = config->has_chunk_file;
+
+  int i = curr_chunk;
+  while(curr_chunk < num_chunks) {
+    
+  }  
+
+}
+void check_Have()
+*/
+
+void helper_createPack(data_packet_t *packet, header_t *header, int num_chunks, 
   char *chunks[]) {
-
-  memset(packet, 0, sizeof(*packet));
-
-  // Create the WHOHAS header
-  header_t *header = &packet->header;
-  header->magicnum = MAGICNUM;
-  header->version = VERSIONNUM;
-  header->packet_type = WHOHAS_TYPE;
-  header->header_len = sizeof(header);
 
   // Calculate the packet length
   // Use num_chunks + 1 to include padding and chunk count at start
   int packet_len = sizeof(header) + CHK_COUNT + PADDING \
     + num_chunks * CHK_HASHLEN;
   if (packet_len > PACKETLEN) {
-    perror("Something went wrong: constructed WHOHAS packet is longer than the \
-maximum possible length.");
+    perror("Something went wrong: constructed packet is longer than the \
+    maximum possible length.");
     exit(1);
   }
   header->packet_len = packet_len;
@@ -92,12 +99,38 @@ maximum possible length.");
     strncpy(packet->data + inc, chunks[i], CHK_HASHLEN);
     inc += CHK_HASHLEN;
     if (inc >= DATALEN) {
-      perror("There are too many chunks to fit in the payload for WHOHAS packet.");
+      perror("There are too many chunks to fit in the payload for packet.");
       exit(1);
     }
   }
 }
 
+void create_whohas_packet(data_packet_t *packet, int num_chunks, 
+  char *chunks[]) {
+
+  memset(packet, 0, sizeof(*packet));
+
+  // Create the WHOHAS header
+  header_t *header = &packet->header;
+  header->magicnum = MAGICNUM;
+  header->version = VERSIONNUM;
+  header->header_len = sizeof(header); 
+  header->packet_type = WHOHAS_TYPE;
+  
+  helper_createPack(packet, header, num_chunks, chunks[]);
+
+}
+
+void create_iHave_packet(data_packet_t *hav_packet, int hav_num_chunks, char *hav_chunks) {
+   memset(hav_packet, 0, sizeof(*hav_packet));
+
+   //Create IHAVE header
+   header_t *hav_header = &hav_packet->header;
+   hav_header->magicnum = MAGICNUM;
+   hav_header->version = VERSIONNUM;
+   hav_header->header_len = sizeof(hav_header);
+   hav_header->packet_type = IHAVE_TYPE;
+} 
 
 
 void process_get(char *chunkfile, char *outputfile) {
@@ -105,9 +138,7 @@ void process_get(char *chunkfile, char *outputfile) {
 	chunkfile, outputfile);
   // Send request to each client on the network to request the file chunks
   // Iterate through nodes and request chunk from each
-  //servaddr.sin_family = AF_INET; 
-  //servaddr.sin_port = htons(PORT); 
-  //servaddr.sin_addr.s_addr = INADDR_ANY; 
+   
 
   // Function to divide chunk list into correct number of packets
   // Two loops to iterate through clients and chunk list
@@ -167,7 +198,7 @@ void peer_run(bt_config_t *config) {
     
     if (nfds > 0) {
       if (FD_ISSET(sock, &readfds)) {
-	process_inbound_udp(sock);
+	process_inbound_udp(sock, config);
       }
       
       if (FD_ISSET(STDIN_FILENO, &readfds)) {
