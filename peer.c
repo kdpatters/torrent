@@ -226,8 +226,15 @@ void iHave_check (data_packet_t *packet, bt_config_t *config) {
 	 inet_ntoa(from.sin_addr),
 	 ntohs(from.sin_port),
 	 buf);
-
    curr = (data_packet_t *)buf;
+
+   // For debugging only
+   char temp[41];
+   strncpy(temp, &curr->data[4], 40);
+   temp[40] = 0;
+   fprintf(stderr, "hash1: %s\n", temp);
+   exit(0);
+
    iHave_check(curr, config);
 } 
 
@@ -275,7 +282,6 @@ void process_get(char *chunkfile, char *outputfile, bt_config_t *config) {
     create_whohas_packet(&packetlist[i], 
       MIN(MAX_CHK_HASHES, num_chunks), 
       &hashes[i * MAX_CHK_HASHES]);
-  exit(0);
   }
 
   // Create the socket
@@ -288,7 +294,7 @@ void process_get(char *chunkfile, char *outputfile, bt_config_t *config) {
   bt_peer_t *p;
   for (p = config->peers; p != NULL; p = p->next) {
     // Iterate through packets, sending each to given peer
-    for (int i = 0; i < sizeof(packetlist); i++) {
+    for (int i = 0; i < list_size; i++) {
       sendto(sockfd, &packetlist[i], packetlist[i].header.packet_len, 0, 
         (const struct sockaddr *) &p->addr, sizeof(p->addr));
     }
