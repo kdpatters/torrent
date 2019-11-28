@@ -49,7 +49,7 @@ int main(int argc, char **argv) {
 }
 
 /* Creates a singly linked list, storing hash and ID */
-int parse_chunkfile(char *chunkfile, chunk_hash_t *chunklist) {
+int parse_chunkfile(char *chunkfile, chunk_hash_t **chunklist) {
   int n_chunks = 0;
 
   // Open chunkfile
@@ -65,7 +65,7 @@ int parse_chunkfile(char *chunkfile, chunk_hash_t *chunklist) {
   char hash[CHK_HASHLEN];
 
   // Zero out the chunklist
-  chunk_hash_t *curr = chunklist;
+  chunk_hash_t *curr = NULL;
 
   int buf_size = MAX_LINE;
   char *buf = malloc(buf_size + 1);
@@ -106,13 +106,14 @@ int parse_chunkfile(char *chunkfile, chunk_hash_t *chunklist) {
       else {
         chunk_hash_t *new_node;
         new_node = malloc(sizeof(chunk_hash_t));
-        assert(new_node!= NULL);
+        assert(new_node != NULL);
         memset(new_node, 0, sizeof(*new_node)); // Zero out the memory
         strncpy(new_node->hash, hash, CHK_HASHLEN);
         new_node->id = id;
 
         if (curr == NULL) {
           curr = new_node;
+          *chunklist = curr;
         }
         else {
           curr->next = new_node;
@@ -172,7 +173,7 @@ void create_iHave_packet(data_packet_t *hav_packet, int hav_num_chunks, char chu
 void iHave_check (data_packet_t *packet, bt_config_t *config) {
 
     chunk_hash_t *chunklist = NULL;
-    int n_chunks = parse_chunkfile(config->has_chunk_file, chunklist); //num of chunks in has_chunk_file
+    int n_chunks = parse_chunkfile(config->has_chunk_file, &chunklist); //num of chunks in has_chunk_file
     chunk_hash_t *curr_ch = chunklist;
 
     char *curr_pack_ch = packet->data; //pointer to start of packet chunk
@@ -206,7 +207,7 @@ void iHave_check (data_packet_t *packet, bt_config_t *config) {
       }
   }
 
- }
+}
 
  void process_inbound_udp(int sock, bt_config_t *config) {
   data_packet_t *curr;
@@ -246,7 +247,7 @@ void create_whohas_packet(data_packet_t *packet, int num_chunks,
 void process_get(char *chunkfile, char *outputfile, bt_config_t *config) {
   // Parse the chunkfile
   chunk_hash_t *chunklist = NULL;
-  int num_chunks = parse_chunkfile(chunkfile, chunklist);
+  int num_chunks = parse_chunkfile(chunkfile, &chunklist);
 
   // Create array of strings
   char hashes[num_chunks][CHK_HASHLEN + 1];
@@ -260,12 +261,13 @@ void process_get(char *chunkfile, char *outputfile, bt_config_t *config) {
     curr = curr->next;
     free(prev);
   }
-
+   
   // Create an array of packets to store the chunk hashes
   int list_size = (num_chunks / MAX_CHK_HASHES) + \
     ((num_chunks % MAX_CHK_HASHES) != 0);
   data_packet_t packetlist[list_size];
   memset(&packetlist, 0, sizeof(packetlist)); // Zero out packetlist memory
+ exit(0); 
 
   // Package the chunks into packets
   for (int i = 0; i < sizeof(*packetlist); i++) {
@@ -280,7 +282,6 @@ void process_get(char *chunkfile, char *outputfile, bt_config_t *config) {
     perror("Could not create socket.");
     exit(1);
   }
-  
   // Iterate through known peers
   bt_peer_t *p;
   for (p = config->peers; p != NULL; p = p->next) {
