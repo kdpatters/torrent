@@ -17,6 +17,11 @@
 #define CHK_COUNT 1
 #define CHK_HASHLEN 20
 #define DATALEN PACKETLEN - sizeof(header_t)
+#define SPACELEFT DATALEN - PADDING - CHK_COUNT
+#define MAX_CHK_HASHES SPACELEFT / CHK_HASHLEN
+
+// File parsing
+#define MAX_LINE (10 ^ 2)
 
 typedef struct header_s {
   short magicnum;
@@ -32,3 +37,9 @@ typedef struct data_packet {
   header_t header;
   char data[DATALEN];
 } data_packet_t;
+
+typedef struct chunk_hash {
+  char hash[CHK_HASHLEN];
+  int id;
+  struct chunk_hash *next;
+} chunk_hash_t;
