@@ -143,13 +143,16 @@ void helper_createPack(data_packet_t *packet, header_t *header, int num_chunks,
 
   // Create the payload
   packet->data[0] = num_chunks;
+  // Zero out the padding
+  memset(&packet->data[1], 0, PADDING);
+
   // Get start of chunks in payload
   
   int inc = CHK_COUNT + PADDING;
   for (int i = 0; i < num_chunks; i++) {
     strncpy(packet->data + inc, chunks[i], CHK_HASHLEN);
     inc += CHK_HASHLEN;
-    if (inc >= DATALEN) {
+    if (inc >= DATALEN - CHK_HASHLEN) {
       fprintf(stderr, "There are too many chunks to fit in the payload for packet.");
       exit(1);
     }
@@ -241,7 +244,6 @@ void create_whohas_packet(data_packet_t *packet, int num_chunks,
   header->packet_type = WHOHAS_TYPE;
   
   helper_createPack(packet, header, num_chunks, chunks);
-
 }
 
 void process_get(char *chunkfile, char *outputfile, bt_config_t *config) {
@@ -267,13 +269,13 @@ void process_get(char *chunkfile, char *outputfile, bt_config_t *config) {
     ((num_chunks % MAX_CHK_HASHES) != 0);
   data_packet_t packetlist[list_size];
   memset(&packetlist, 0, sizeof(packetlist)); // Zero out packetlist memory
- exit(0); 
 
   // Package the chunks into packets
-  for (int i = 0; i < sizeof(*packetlist); i++) {
+  for (int i = 0; i < list_size; i++) {
     create_whohas_packet(&packetlist[i], 
       MIN(MAX_CHK_HASHES, num_chunks), 
       &hashes[i * MAX_CHK_HASHES]);
+  exit(0);
   }
 
   // Create the socket
