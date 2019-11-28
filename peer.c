@@ -8,10 +8,13 @@
 #include <sys/types.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
+#include <sys/param.h>
 #include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
+#include <math.h>
 #include "debug.h"
 #include "spiffy.h"
 #include "bt_parse.h"
@@ -45,9 +48,101 @@ int main(int argc, char **argv) {
   return 0;
 }
 
+/* Creates a singly linked list, storing hash and ID */
+int parse_chunkfile(char *chunkfile, chunk_hash_t *chunklist) {
+  int n_chunks = 0;
 
-void process_inbound_udp(int sock, bt_config_t *config) {
- // data_packet_t curr*;
+  // Open chunkfile
+  FILE *f;
+  f = fopen(chunkfile, "r");
+  if (f == NULL) {
+    fprintf(stderr, "Could not read chunkfile \"%s\".", chunkfile);
+    exit(1);
+  }
+
+  // Store data for individual chunk has
+  int *id = NULL;
+  char hash[CHK_HASHLEN];
+
+  // Zero out the chunklist
+  memset(chunklist, 0, sizeof(*chunklist));
+  chunk_hash_t *curr = chunklist;
+
+  char *buf = malloc(MAX_LINE);
+  // Read a line from the chunklist file
+  while (getline(&buf, (size_t *) sizeof(buf), f) > 0) {
+    if (strlen(buf) < CHK_HASHLEN + strlen("0 ")) {
+      fprintf(stderr, "Line \"%s\" in chunkfile \"%s\" was too short and could not be parsed.", 
+        buf, chunkfile);
+    }
+    // Attempt to parse ID and hash from current line in file
+    else {
+      if (sscanf(buf, "%d %s\n", id, hash) < 2) {
+        fprintf(stderr, "Could not parse both id and hash from line \"%s\" in chunkfile \"%s\".", 
+          buf, chunkfile);
+      }
+      else if (strlen(hash) != CHK_HASHLEN) {
+        fprintf(stderr, "Expect hash \"%s\" to be of length %d.", hash, CHK_HASHLEN);
+      }
+      // Found correct number of arguments and of correct lengths, so allocate
+      // a new node 
+      else {
+        curr = (chunk_hash_t *) malloc(sizeof(chunk_hash_t));
+        assert(curr != NULL);
+        memset(curr, 0, sizeof(*curr)); // Zero out the memory
+        strcpy(curr->hash, hash);
+        curr->id = *id;
+        curr = curr->next;
+        n_chunks++;
+      }
+    }
+  }
+  free(buf); // Since buf may have been reallocated by `getline`, free it
+  return n_chunks;
+}
+
+ void iHave_check (data_packet_t *packet, bt_config_t *config) {
+
+    chunk_hash_t *chunklist = NULL;
+    int n_chunks = parse_chunkfile(config->has_chunk_file, chunklist); //num of chunks in has_chunk_file
+    chunk_hash_t *curr_ch = chunklist;
+
+    char *curr_pack_ch = packet->data[0]; //pointer to start of packet chunk
+    int num_chunks = *curr_pack_ch; //dereference to get stored number of chunks in packet
+
+    curr_pack_ch += PADDING + CHK_COUNT; //get to the start of chunk of hashes
+    /* char hashes[num_chunks][CHK_HASHLEN]; //to store matching hashes
+    memset(hashes, 0, sizeof(hashes)); */
+    char matched[CHK_HASHLEN * MAX_CHK_HASHES];
+    int m_point = 0;
+
+    data_packet_t newpack; 
+    header_t *new_header;
+
+    for(int i = 0; i < num_chunks; i++) { //for each chunk in packet
+      for(int j = 0; j < n_chunks; j++) { //each chunk in has_chunk_file
+        char compare[CHK_HASHLEN + 1]; 
+        memset(compare, 0, sizeof(compare));
+        strncpy(compare, curr_pack_ch + i * CHK_HASHLEN, CHK_HASHLEN);
+
+        if (strcmp(compare, curr_ch->hash) == 0) {
+          strncpy(&matched[m_point++], compare, sizeof(compare));
+
+          if(m_point >= sizeof(matched)) {
+            create_iHave_packet(newpack, new_header, m_point, matched); //create iHave packet
+            memset(matched, 0, sizeof(matched)); //clearing array of strings
+            m_point = 0; //set mno. of matches to 0 for the next packet
+          }
+
+        }
+        curr_ch = curr_ch->next; // Move on to next chunk hash        
+      }
+  }
+
+ }
+
+ void process_inbound_udp(int sock, bt_config_t *config) {
+  data_packet_t *curr;
   struct sockaddr_in from;
   socklen_t fromlen;
   char buf[PACKETLEN];
@@ -61,21 +156,10 @@ void process_inbound_udp(int sock, bt_config_t *config) {
 	 ntohs(from.sin_port),
 	 buf);
 
-   //curr = (data_packet_t)buf;
-   //iHave_check(buf, config);
-}
+   curr = (data_packet_t *)buf;
+   iHave_check(curr, config);
+} 
 
-/* void iHave_check(data_packet_t *packet, bt_config_t config) {
-   void *curr_chunk = config->has_chunk_file;
-
-  int i = curr_chunk;
-  while(curr_chunk < num_chunks) {
-    
-  }  
-
-}
-void check_Have()
-*/
 
 void helper_createPack(data_packet_t *packet, header_t *header, int num_chunks, 
   char *chunks[]) {
@@ -94,12 +178,13 @@ void helper_createPack(data_packet_t *packet, header_t *header, int num_chunks,
   // Create the payload
   packet->data[0] = num_chunks;
   // Get start of chunks in payload
+  char *curr_chunk = chunks;
   int inc = CHK_COUNT + PADDING;
   for (int i = 0; i < num_chunks; i++) {
-    strncpy(packet->data + inc, chunks[i], CHK_HASHLEN);
+    strncpy(packet->data + inc, curr_chunk[i], CHK_HASHLEN);
     inc += CHK_HASHLEN;
     if (inc >= DATALEN) {
-      perror("There are too many chunks to fit in the payload for packet.");
+      fprintf(stderr, "There are too many chunks to fit in the payload for packet.");
       exit(1);
     }
   }
@@ -117,11 +202,11 @@ void create_whohas_packet(data_packet_t *packet, int num_chunks,
   header->header_len = sizeof(header); 
   header->packet_type = WHOHAS_TYPE;
   
-  helper_createPack(packet, header, num_chunks, chunks[]);
+  helper_createPack(packet, header, num_chunks, chunks);
 
 }
 
-void create_iHave_packet(data_packet_t *hav_packet, int hav_num_chunks, char *hav_chunks) {
+void create_iHave_packet(data_packet_t *hav_packet, int hav_num_chunks, char *chunks[]) {
    memset(hav_packet, 0, sizeof(*hav_packet));
 
    //Create IHAVE header
@@ -130,33 +215,56 @@ void create_iHave_packet(data_packet_t *hav_packet, int hav_num_chunks, char *ha
    hav_header->version = VERSIONNUM;
    hav_header->header_len = sizeof(hav_header);
    hav_header->packet_type = IHAVE_TYPE;
+
+   helper_createPack(hav_packet, hav_header, hav_num_chunks, chunks);
 } 
 
 
-void process_get(char *chunkfile, char *outputfile) {
-  printf("PROCESS GET SKELETON CODE CALLED.  Fill me in!  (%s, %s)\n", 
-	chunkfile, outputfile);
-  // Send request to each client on the network to request the file chunks
-  // Iterate through nodes and request chunk from each
-   
+void process_get(char *chunkfile, char *outputfile, bt_config_t *config) {
+  // Parse the chunkfile
+  chunk_hash_t *chunklist = NULL;
+  int num_chunks = parse_chunkfile(chunkfile, chunklist);
 
-  // Function to divide chunk list into correct number of packets
-  // Two loops to iterate through clients and chunk list
+  // Create an array of packets to store the chunk hashes
+  data_packet_t *packetlist[(int) ceill((double) num_chunks / 
+    (double) MAX_CHK_HASHES)];
+  memset(packetlist, 0, sizeof(*packetlist)); // Zero out packetlist memory
 
-  //create_whohas_packet(data_packet_t *packet, int num_chunks, 
-  //  char *chunks[]);
-  //sentto(sockfd, MSG, MSG_LEN, MSG_CONFIRM, (const struct sockaddr *) &);
+  // Package the chunks into packets
+  for (int i = 0; i < sizeof(packetlist); i++) {
+    create_whohas_packet(packetlist[i], 
+      MIN(MAX_CHK_HASHES, num_chunks), 
+      &chunklist[i * MAX_CHK_HASHES]);
+  }
+
+  // Create the socket
+  int sockfd;
+  if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+    perror("Could not create socket.");
+    exit(1);
+  }
+  
+  // Iterate through known peers
+  bt_peer_t *p;
+  for (p = config->peers; p != NULL; p = p->next) {
+    // Iterate through packets, sending each to given peer
+    for (int i = 0; i < sizeof(packetlist); i++) {
+      sendto(sockfd, packetlist[i], packetlist[i]->header.packet_len, 0, 
+        (const struct sockaddr *) &p->addr, sizeof(p->addr));
+    }
+  }
+  //
 }
 
 void handle_user_input(char *line, void *cbdata) {
   char chunkf[128], outf[128];
+  bt_config_t *config = (bt_config_t *) cbdata;
 
   bzero(chunkf, sizeof(chunkf));
   bzero(outf, sizeof(outf));
-
   if (sscanf(line, "GET %120s %120s", chunkf, outf)) {
     if (strlen(outf) > 0) {
-      process_get(chunkf, outf);
+      process_get(chunkf, outf, config);
     }
   }
 }
@@ -202,8 +310,7 @@ void peer_run(bt_config_t *config) {
       }
       
       if (FD_ISSET(STDIN_FILENO, &readfds)) {
-	process_user_input(STDIN_FILENO, userbuf, handle_user_input,
-			   "Currently unused");
+	process_user_input(STDIN_FILENO, userbuf, handle_user_input, config);
       }
     }
   }
