@@ -47,12 +47,12 @@ int main(int argc, char **argv) {
   peer_run(&config);
   return 0;
 }
-
+//to convert chunk hashes from string format to actual hexadecimal bytes 
 void hashstr_to_bytes(char instr[CHK_HASHLEN], char outstr[CHK_HASH_BYTES]) {
   for (int i = 0; i < CHK_HASH_BYTES; i++)
     sscanf(&instr[i * 2], "%2hhx", &outstr[i]);
 }
-
+//hash bytes back to string 
 void bytes_to_hashstr(char instr[CHK_HASH_BYTES], char outstr[CHK_HASHLEN]) {
   for (int i = 0; i < CHK_HASH_BYTES; i++)
     sprintf(&outstr[i * 2], "%02hhx", instr[i]);
@@ -137,6 +137,18 @@ int parse_chunkfile(char *chunkfile, chunk_hash_t **chunklist) {
   return n_chunks;
 }
 
+void send_iHave_pack (data_packet_t *pack, struct sockaddr_in *from) {
+// Create the socket
+  int sockfd;
+  if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+    perror("Could not create socket.");
+    exit(1);
+  }
+  //send packet to peer requesting it
+      sendto(sockfd, pack, sizeof(pack), 0, 
+        (const struct sockaddr *) from, sizeof(from));
+  }
+
 void helper_createPack(data_packet_t *packet, header_t *header, int num_chunks, 
   char chunks[][CHK_HASHLEN + 1]) {
 
@@ -171,7 +183,6 @@ void helper_createPack(data_packet_t *packet, header_t *header, int num_chunks,
   }
 }
 
-
 void create_iHave_packet(data_packet_t *hav_packet, int hav_num_chunks, char chunks[][CHK_HASHLEN + 1]) {
    memset(hav_packet, 0, sizeof(*hav_packet));
 
@@ -185,7 +196,7 @@ void create_iHave_packet(data_packet_t *hav_packet, int hav_num_chunks, char chu
    helper_createPack(hav_packet, hav_header, hav_num_chunks, chunks);
 } 
 
-void iHave_check (data_packet_t *packet, bt_config_t *config) {
+void iHave_check (data_packet_t *packet, bt_config_t *config, struct sockaddr_in *from) {
 
     chunk_hash_t *chunklist = NULL;
     int n_chunks = parse_chunkfile(config->has_chunk_file, &chunklist); //num of chunks in has_chunk_file
@@ -213,6 +224,7 @@ void iHave_check (data_packet_t *packet, bt_config_t *config) {
 
           if(m_point >= sizeof(matched)) {
             create_iHave_packet(&newpack, m_point, matched); //create iHave packet
+            send_iHave_pack(&newpack, from); //send the packet to peer requesting
             memset(matched, 0, sizeof(matched)); //clearing array of strings
             m_point = 0; //set mno. of matches to 0 for the next packet
           }
@@ -221,7 +233,6 @@ void iHave_check (data_packet_t *packet, bt_config_t *config) {
         curr_ch = curr_ch->next; // Move on to next chunk hash        
       }
   }
-
 }
 
  void process_inbound_udp(int sock, bt_config_t *config) {
@@ -248,7 +259,7 @@ void iHave_check (data_packet_t *packet, bt_config_t *config) {
    fprintf(stderr, "hash: %s\n", hashstr);
    exit(0);
 
-   iHave_check(curr, config);
+   iHave_check(curr, config, &from);
 } 
 
 void create_whohas_packet(data_packet_t *packet, int num_chunks, 
