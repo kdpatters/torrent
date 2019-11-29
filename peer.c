@@ -245,7 +245,7 @@ void iHave_check(data_packet_t *packet, bt_config_t *config, struct sockaddr_in 
   }
 }
 
- void process_inbound_udp(int sock, bt_config_t *config) {
+void process_inbound_udp(int sock, bt_config_t *config) {
   data_packet_t *pack;
   struct sockaddr_in from;
   socklen_t fromlen;
@@ -259,7 +259,7 @@ void iHave_check(data_packet_t *packet, bt_config_t *config, struct sockaddr_in 
 	 "Incoming message from %s:%d\n%s\n\n", 
 	 inet_ntoa(from.sin_addr),
 	 ntohs(from.sin_port),
-	 buf); */
+	 buf); */ 
    pack = (data_packet_t *)buf;
    // TODO: use a switch instead of an IF
    if (pack->header.packet_type == WHOHAS_TYPE) {
@@ -317,11 +317,10 @@ void process_get(char *chunkfile, char *outputfile, bt_config_t *config) {
   // Iterate through known peers
   bt_peer_t *p;
   for (p = config->peers; p != NULL; p = p->next) {
-    // Iterate through packets, sending each to given peer
-    for (int i = 0; i < list_size; i++) {
-    send_pack(&packetlist[i], &p->addr, config);  
-    //sendto(sockfd, &packetlist[i], packetlist[i].header.packet_len, 0, 
-   //     (const struct sockaddr *) &p->addr, sizeof(p->addr));
+    if (p->id != config->identity) {
+        // Iterate through packets, sending each to given peer
+        for (int i = 0; i < list_size; i++)
+          send_pack(&packetlist[i], &p->addr, config); 
     }
   }
 }
