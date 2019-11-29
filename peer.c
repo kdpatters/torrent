@@ -200,7 +200,6 @@ void iHave_check (data_packet_t *packet, bt_config_t *config, struct sockaddr_in
 
     chunk_hash_t *chunklist = NULL;
     int n_chunks = parse_chunkfile(config->has_chunk_file, &chunklist); //num of chunks in has_chunk_file
-    chunk_hash_t *curr_ch = chunklist;
 
     char *curr_pack_ch = packet->data; //pointer to start of packet chunk
     int num_chunks = *curr_pack_ch; //dereference to get stored number of chunks in packet
@@ -212,14 +211,15 @@ void iHave_check (data_packet_t *packet, bt_config_t *config, struct sockaddr_in
     int m_point = 0;
 
     data_packet_t newpack; 
-
+    
     for(int i = 0; i < num_chunks; i++) { //for each chunk in packet
+      chunk_hash_t *curr_ch = chunklist;
       for(int j = 0; j < n_chunks; j++) { //each chunk in has_chunk_file
         char compare[CHK_HASHLEN + 1]; 
         memset(compare, 0, sizeof(compare));
         strncpy(compare, curr_pack_ch + i * CHK_HASHLEN, CHK_HASHLEN);
-
-        if (strcmp(compare, curr_ch->hash) == 0) {
+        printf("%s\n", curr_ch->hash);
+        if (strncmp(compare, curr_ch->hash, CHK_HASHLEN) == 0) {
           strncpy(matched[m_point++], compare, sizeof(compare));
 
           if(m_point >= sizeof(matched)) {
@@ -257,7 +257,6 @@ void iHave_check (data_packet_t *packet, bt_config_t *config, struct sockaddr_in
    memcpy(temp, &curr->data[CHK_COUNT + PADDING], CHK_HASH_BYTES);
    bytes_to_hashstr(temp, hashstr);
    fprintf(stderr, "hash: %s\n", hashstr);
-   exit(0);
 
    iHave_check(curr, config, &from);
 } 
