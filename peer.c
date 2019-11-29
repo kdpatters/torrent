@@ -137,16 +137,25 @@ int parse_chunkfile(char *chunkfile, chunk_hash_t **chunklist) {
   return n_chunks;
 }
 
-void send_iHave_pack (data_packet_t *pack, struct sockaddr_in *from) {
-// Create the socket
-  int sockfd;
-  if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-    perror("Could not create socket.");
-    exit(1);
-  }
+void send_pack(data_packet_t *pack, struct sockaddr_in *dest, bt_config_t *config) {
+  //printf("sending pack\n");
+  // Create the socket
+  int sockfd = config->sock;
+  //if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+  //  perror("Could not create socket.");
+  //  exit(1);
+  //}
+  struct sockaddr_in myaddr;
+  memset(&myaddr, 0, sizeof(myaddr));
+  memcpy(&myaddr.sin_addr, &dest->sin_addr, sizeof(dest->sin_addr));
+  memcpy(&myaddr.sin_port, &dest->sin_port, sizeof(dest->sin_port));
+  myaddr.sin_family = AF_INET;
+
   //send packet to peer requesting it
-      sendto(sockfd, pack, sizeof(pack), 0, 
-        (const struct sockaddr *) from, sizeof(from));
+      sendto(sockfd, pack, pack->header.packet_len, 0, 
+        (const struct sockaddr *) &myaddr, sizeof(myaddr));
+    //sendto(sockfd, &packetlist[i], packetlist[i].header.packet_len, 0, 
+   //     (const struct sockaddr *) &p->addr, sizeof(p->addr));
   }
 
 void helper_createPack(data_packet_t *packet, header_t *header, int num_chunks, 
@@ -196,7 +205,7 @@ void create_iHave_packet(data_packet_t *hav_packet, int hav_num_chunks, char chu
    helper_createPack(hav_packet, hav_header, hav_num_chunks, chunks);
 } 
 
-void iHave_check (data_packet_t *packet, bt_config_t *config, struct sockaddr_in *from) {
+void iHave_check(data_packet_t *packet, bt_config_t *config, struct sockaddr_in *from) {
 
     chunk_hash_t *chunklist = NULL;
     int n_chunks = parse_chunkfile(config->has_chunk_file, &chunklist); //num of chunks in has_chunk_file
@@ -205,8 +214,6 @@ void iHave_check (data_packet_t *packet, bt_config_t *config, struct sockaddr_in
     int num_chunks = *curr_pack_ch; //dereference to get stored number of chunks in packet
 
     curr_pack_ch += PADDING + CHK_COUNT; //get to the start of chunk of hashes
-    /* char hashes[num_chunks][CHK_HASHLEN]; //to store matching hashes
-    memset(hashes, 0, sizeof(hashes)); */
     char matched[MAX_CHK_HASHES][CHK_HASHLEN + 1];
     int m_point = 0;
 
@@ -214,29 +221,32 @@ void iHave_check (data_packet_t *packet, bt_config_t *config, struct sockaddr_in
     
     for(int i = 0; i < num_chunks; i++) { //for each chunk in packet
       chunk_hash_t *curr_ch = chunklist;
+      char compare[CHK_HASHLEN + 1]; 
+      memset(compare, 0, sizeof(compare));
+      bytes_to_hashstr(curr_pack_ch + i * CHK_HASH_BYTES, compare);
       for(int j = 0; j < n_chunks; j++) { //each chunk in has_chunk_file
-        char compare[CHK_HASHLEN + 1]; 
-        memset(compare, 0, sizeof(compare));
-        strncpy(compare, curr_pack_ch + i * CHK_HASHLEN, CHK_HASHLEN);
-        printf("%s\n", curr_ch->hash);
         if (strncmp(compare, curr_ch->hash, CHK_HASHLEN) == 0) {
           strncpy(matched[m_point++], compare, sizeof(compare));
-
-          if(m_point >= sizeof(matched)) {
+          if (m_point >= sizeof(matched)) {
             create_iHave_packet(&newpack, m_point, matched); //create iHave packet
-            send_iHave_pack(&newpack, from); //send the packet to peer requesting
+            send_pack(&newpack, from, config); //send the packet to peer requesting
             memset(matched, 0, sizeof(matched)); //clearing array of strings
             m_point = 0; //set mno. of matches to 0 for the next packet
           }
-
+          break;
         }
         curr_ch = curr_ch->next; // Move on to next chunk hash        
       }
   }
+  // Send packet if there is still data left to send
+  if (m_point > 0) {
+    create_iHave_packet(&newpack, m_point, matched); //create iHave packet
+    send_pack(&newpack, from, config); //send the packet to peer requesting
+  }
 }
 
  void process_inbound_udp(int sock, bt_config_t *config) {
-  data_packet_t *curr;
+  data_packet_t *pack;
   struct sockaddr_in from;
   socklen_t fromlen;
   char buf[PACKETLEN];
@@ -244,21 +254,17 @@ void iHave_check (data_packet_t *packet, bt_config_t *config, struct sockaddr_in
   fromlen = sizeof(from);
   spiffy_recvfrom(sock, buf, PACKETLEN, 0, (struct sockaddr *) &from, &fromlen);
 
+/*
   printf("PROCESS_INBOUND_UDP SKELETON -- replace!\n"
 	 "Incoming message from %s:%d\n%s\n\n", 
 	 inet_ntoa(from.sin_addr),
 	 ntohs(from.sin_port),
-	 buf);
-   curr = (data_packet_t *)buf;
-
-   // For debugging only
-   char temp[CHK_HASH_BYTES];
-   char hashstr[CHK_HASHLEN];
-   memcpy(temp, &curr->data[CHK_COUNT + PADDING], CHK_HASH_BYTES);
-   bytes_to_hashstr(temp, hashstr);
-   fprintf(stderr, "hash: %s\n", hashstr);
-
-   iHave_check(curr, config, &from);
+	 buf); */
+   pack = (data_packet_t *)buf;
+   // TODO: use a switch instead of an IF
+   if (pack->header.packet_type == WHOHAS_TYPE) {
+     iHave_check(pack, config, &from);
+   }
 } 
 
 void create_whohas_packet(data_packet_t *packet, int num_chunks, 
@@ -305,21 +311,17 @@ void process_get(char *chunkfile, char *outputfile, bt_config_t *config) {
     create_whohas_packet(&packetlist[i], 
       MIN(MAX_CHK_HASHES, num_chunks), 
       &hashes[i * MAX_CHK_HASHES]);
+    num_chunks -= MIN(MAX_CHK_HASHES, num_chunks);
   }
 
-  // Create the socket
-  int sockfd;
-  if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-    perror("Could not create socket.");
-    exit(1);
-  }
   // Iterate through known peers
   bt_peer_t *p;
   for (p = config->peers; p != NULL; p = p->next) {
     // Iterate through packets, sending each to given peer
     for (int i = 0; i < list_size; i++) {
-      sendto(sockfd, &packetlist[i], packetlist[i].header.packet_len, 0, 
-        (const struct sockaddr *) &p->addr, sizeof(p->addr));
+    send_pack(&packetlist[i], &p->addr, config);  
+    //sendto(sockfd, &packetlist[i], packetlist[i].header.packet_len, 0, 
+   //     (const struct sockaddr *) &p->addr, sizeof(p->addr));
     }
   }
 }
@@ -362,7 +364,8 @@ void peer_run(bt_config_t *config) {
     perror("peer_run could not bind socket");
     exit(-1);
   }
-  
+   
+  config->sock = sock; // Set socket 
   spiffy_init(config->identity, (struct sockaddr *)&myaddr, sizeof(myaddr));
   
   while (1) {
