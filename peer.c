@@ -31,7 +31,7 @@ int main(int argc, char **argv) {
   DPRINTF(DEBUG_INIT, "peer.c main beginning\n");
 
 #ifdef TESTING
-  config.identity = 1; // your group number here
+  config.identity = 3; // your group number here
   strcpy(config.chunk_file, "chunkfile");
   strcpy(config.has_chunk_file, "haschunks");
 #endif
@@ -46,6 +46,16 @@ int main(int argc, char **argv) {
   
   peer_run(&config);
   return 0;
+}
+
+void hashstr_to_bytes(char instr[CHK_HASHLEN], char outstr[CHK_HASH_BYTES]) {
+  for (int i = 0; i < CHK_HASH_BYTES; i++)
+    sscanf(&instr[i * 2], "%2hhx", &outstr[i]);
+}
+
+void bytes_to_hashstr(char instr[CHK_HASH_BYTES], char outstr[CHK_HASHLEN]) {
+  for (int i = 0; i < CHK_HASH_BYTES; i++)
+    sprintf(&outstr[i * 2], "%02hhx", instr[i]);
 }
 
 /* Creates a singly linked list, storing hash and ID */
@@ -133,7 +143,7 @@ void helper_createPack(data_packet_t *packet, header_t *header, int num_chunks,
   // Calculate the packet length
   // Use num_chunks + 1 to include padding and chunk count at start
   int packet_len = sizeof(header) + CHK_COUNT + PADDING \
-    + num_chunks * CHK_HASHLEN;
+    + num_chunks * CHK_HASH_BYTES;
   if (packet_len > PACKETLEN) {
     perror("Something went wrong: constructed packet is longer than the \
     maximum possible length.");
@@ -150,9 +160,11 @@ void helper_createPack(data_packet_t *packet, header_t *header, int num_chunks,
   
   int inc = CHK_COUNT + PADDING;
   for (int i = 0; i < num_chunks; i++) {
-    strncpy(packet->data + inc, chunks[i], CHK_HASHLEN);
-    inc += CHK_HASHLEN;
-    if (inc >= DATALEN - CHK_HASHLEN) {
+    char chunk_bytes[CHK_HASH_BYTES];
+    hashstr_to_bytes(chunks[i], chunk_bytes);
+    memcpy(packet->data + inc, chunk_bytes, CHK_HASH_BYTES);
+    inc += CHK_HASH_BYTES;
+    if (inc >= DATALEN - CHK_HASH_BYTES) {
       fprintf(stderr, "There are too many chunks to fit in the payload for packet.");
       exit(1);
     }
@@ -229,10 +241,11 @@ void iHave_check (data_packet_t *packet, bt_config_t *config) {
    curr = (data_packet_t *)buf;
 
    // For debugging only
-   char temp[41];
-   strncpy(temp, &curr->data[4], 40);
-   temp[40] = 0;
-   fprintf(stderr, "hash1: %s\n", temp);
+   char temp[CHK_HASH_BYTES];
+   char hashstr[CHK_HASHLEN];
+   memcpy(temp, &curr->data[CHK_COUNT + PADDING], CHK_HASH_BYTES);
+   bytes_to_hashstr(temp, hashstr);
+   fprintf(stderr, "hash: %s\n", hashstr);
    exit(0);
 
    iHave_check(curr, config);
