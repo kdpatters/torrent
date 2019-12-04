@@ -158,7 +158,7 @@ void send_pack(data_packet_t *pack, struct sockaddr_in *dest, bt_config_t *confi
    //     (const struct sockaddr *) &p->addr, sizeof(p->addr));
   }
 
-void helper_createPack(data_packet_t *packet, header_t *header, int num_chunks, 
+void create_pack_helper(data_packet_t *packet, header_t *header, int num_chunks, 
   char chunks[][CHK_HASHLEN + 1]) {
 
   // Calculate the packet length
@@ -202,7 +202,7 @@ void create_iHave_packet(data_packet_t *hav_packet, int hav_num_chunks, char chu
    hav_header->header_len = sizeof(hav_header);
    hav_header->packet_type = IHAVE_TYPE;
 
-   helper_createPack(hav_packet, hav_header, hav_num_chunks, chunks);
+   create_pack_helper(hav_packet, hav_header, hav_num_chunks, chunks);
 } 
 
 void iHave_check(data_packet_t *packet, bt_config_t *config, struct sockaddr_in *from) {
@@ -260,11 +260,29 @@ void process_inbound_udp(int sock, bt_config_t *config) {
 	 inet_ntoa(from.sin_addr),
 	 ntohs(from.sin_port),
 	 buf); */ 
-   pack = (data_packet_t *)buf;
-   // TODO: use a switch instead of an IF
-   if (pack->header.packet_type == WHOHAS_TYPE) {
-     iHave_check(pack, config, &from);
-   }
+  pack = (data_packet_t *)buf;
+  switch (pack->header.packet_type) {
+    case WHOHAS_TYPE:
+      iHave_check(pack, config, &from);
+      break;
+    case IHAVE_TYPE:
+      printf("Received IHAVE packet.\n");
+      break;
+    case GET_TYPE:
+      printf("Received GET packet.\n");
+      break;
+    case DATA_TYPE:
+      printf("Received DATA packet.\n");
+      break;
+    case ACK_TYPE:
+      printf("Received ACK packet.\n");
+      break;
+    case DENIED_TYPE:
+      printf("Received DENIED packet.\n");
+      break;
+    default:
+      printf("Packet type %d not understood.\n", pack->header.packet_type);
+  }
 } 
 
 void create_whohas_packet(data_packet_t *packet, int num_chunks, 
@@ -279,7 +297,7 @@ void create_whohas_packet(data_packet_t *packet, int num_chunks,
   header->header_len = sizeof(header); 
   header->packet_type = WHOHAS_TYPE;
   
-  helper_createPack(packet, header, num_chunks, chunks);
+  create_pack_helper(packet, header, num_chunks, chunks);
 }
 
 void process_get(char *chunkfile, char *outputfile, bt_config_t *config) {
