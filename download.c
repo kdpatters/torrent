@@ -6,6 +6,7 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <time.h>
 #include "download.h"
 #include "peer.h"
 
@@ -65,6 +66,10 @@ void send_get(struct sockaddr_in *dest, char hash[CHK_HASH_BYTES],
     send_pack(&pack, dest, config); // Send the GET packet
 }
 
+void begin_download() {
+    // DO SOMETHING...
+}
+
 /* 
  * init_download
  * 
@@ -77,6 +82,7 @@ void init_download(char hash[][CHK_HASH_BYTES], int n_hashes,
     // Get a pointer to the first empty download
     dload_t *curr = &(downloads->downloads)[find_first_empty(downloads)];
     curr->ihave_recv = malloc(sizeof(ihave_list_t) * n_hashes);
+    curr->n_hashes = n_hashes;
     for (int i = 0; i < n_hashes; i++) {
         // Get and store hash ID
         curr->ihave_recv[i].chunk_id = hash2id(hash[i], config);
@@ -105,8 +111,15 @@ void process_ihave(data_packet_t *packet, bt_config_t *config,
         // Read and store the next hash
         memcpy(hash, packet->data + offset, inc);
 
+        // THIS NEEDS A LOT OF WORK; TODO
         // Try to match returned hash to requested one and store peer identity
-        // TODO
+        //int id = hash2id(hash, config);
+        //for (int j = 0; j < downloads[0].n_hashes; j++) {
+        //    if (downloads[0].ihave_recv[j].chunk_id == id) {
+                // Add peer to peer list
+                //add_peer(downloads[0].ihave_recv[j].peers, SOMETHING);
+        //    }
+        //}
 
         offset += inc;
         if (offset > max_offset) {
@@ -118,9 +131,29 @@ void process_ihave(data_packet_t *packet, bt_config_t *config,
 
 /*
  * check_retry_get
+ * 
+ * Check timeout for when last data packet received and last get sent have been 
+ * exceeded.  If less than the maximum number of gets have been sent, then 
+ * resend another get.  Otherwise, 
  */
-void check_retry_get() {
-    // Check when the last get was sent
+void check_retry_get(chunk_download_t chunk_dload) { // Need to pass in downloads as an argument
+    clock_t now = clock();
+    
+    /* 
+     * Check if timeouts for when last get was sent and last data packet was 
+     * received have been exceeded.
+     */
+    if ((now - chunk_dload.last_get_sent > GET_WINDOW) &&
+        (now - chunk_dload.last_data_recv > DATA_WINDOW)) {
+        if (chunk_dload.n_tries_get < MAX_RETRIES_GET) {
+            // TODO
+            //send_get(...);
+        }
+        else {
+            /* Try to finish by downloading the chunk from a different peer. */
+            // TODO
+        }
+    }
     // Check when the last data packet was received
     // Either attempt to verify chunk, stop download entirely (if max retries exceeded), or send another GET
 }
