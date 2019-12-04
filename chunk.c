@@ -11,6 +11,7 @@
 #include <stdlib.h> // for malloc
 #include <string.h> // for memset
 
+
 /**
  * fp -- the file pointer you want to chunkify.
  * chunk_hashes -- The chunks are stored at this locations.

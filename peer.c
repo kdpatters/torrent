@@ -20,6 +20,7 @@
 #include "bt_parse.h"
 #include "input_buffer.h"
 #include "peer.h"
+#include "upload.h"
 
 void peer_run(bt_config_t *config);
 
@@ -70,7 +71,7 @@ int parse_chunkfile(char *chunkfile, chunk_hash_t **chunklist) {
     exit(1);
   }
 
-  // Store data for individual chunk has
+  // Store data for individual chunk hash
   int id;
   char hash[CHK_HASHLEN];
 
@@ -245,6 +246,10 @@ void iHave_check(data_packet_t *packet, bt_config_t *config, struct sockaddr_in 
   }
 }
 
+upload(data_packet_t pack, config_t config, struct sock_in_addr *addr) {
+
+ }
+
 void process_inbound_udp(int sock, bt_config_t *config) {
   data_packet_t *pack;
   struct sockaddr_in from;
@@ -265,6 +270,10 @@ void process_inbound_udp(int sock, bt_config_t *config) {
    if (pack->header.packet_type == WHOHAS_TYPE) {
      iHave_check(pack, config, &from);
    }
+
+   if(pack->header.packet_type == GET_TYPE) {
+     upload(pack, config, &from);
+   }                                             
 } 
 
 void create_whohas_packet(data_packet_t *packet, int num_chunks, 

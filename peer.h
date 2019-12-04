@@ -22,6 +22,8 @@
 #define SPACELEFT (DATALEN - PADDING - CHK_COUNT)
 #define MAX_CHK_HASHES (SPACELEFT / CHK_HASH_BYTES)
 
+#define OFFSET 512 000 //bytes
+
 // File parsing
 #define MAX_LINE (10 ^ 2)
 
