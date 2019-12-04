@@ -11,6 +11,25 @@
 #include <stdlib.h> // for malloc
 #include <string.h> // for memset
 
+<<<<<<< HEAD
+=======
+/*
+ * Return the ID for a specific hash given as bytes.  If the ID is not
+ * found, the function will return -1.
+ */
+int hash2id(char *hash, bt_config_t *config) {
+    chunk_hash_t *chunklist = NULL;
+    int n_chunks = 0; // stupid stupid stupid
+    
+    chunk_hash_t *curr_ch = chunklist;
+    for (int j = 0; j < n_chunks; j++) {
+        if (strncmp(hash, curr_ch->hash, CHK_HASHLEN))
+            return curr_ch->id;
+        curr_ch = curr_ch->next; // Move on to next chunk hash if not found
+    }
+	return -1;
+}
+>>>>>>> df9a181f4f5640dc6c126adb24ea3a4bbd3471a0
 
 /**
  * fp -- the file pointer you want to chunkify.

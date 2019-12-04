@@ -20,7 +20,11 @@
 #include "bt_parse.h"
 #include "input_buffer.h"
 #include "peer.h"
+<<<<<<< HEAD
 #include "upload.h"
+=======
+#include "download.h"
+>>>>>>> df9a181f4f5640dc6c126adb24ea3a4bbd3471a0
 
 void peer_run(bt_config_t *config);
 
@@ -138,28 +142,7 @@ int parse_chunkfile(char *chunkfile, chunk_hash_t **chunklist) {
   return n_chunks;
 }
 
-void send_pack(data_packet_t *pack, struct sockaddr_in *dest, bt_config_t *config) {
-  //printf("sending pack\n");
-  // Create the socket
-  int sockfd = config->sock;
-  //if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-  //  perror("Could not create socket.");
-  //  exit(1);
-  //}
-  struct sockaddr_in myaddr;
-  memset(&myaddr, 0, sizeof(myaddr));
-  memcpy(&myaddr.sin_addr, &dest->sin_addr, sizeof(dest->sin_addr));
-  memcpy(&myaddr.sin_port, &dest->sin_port, sizeof(dest->sin_port));
-  myaddr.sin_family = AF_INET;
-
-  //send packet to peer requesting it
-      sendto(sockfd, pack, pack->header.packet_len, 0, 
-        (const struct sockaddr *) &myaddr, sizeof(myaddr));
-    //sendto(sockfd, &packetlist[i], packetlist[i].header.packet_len, 0, 
-   //     (const struct sockaddr *) &p->addr, sizeof(p->addr));
-  }
-
-void helper_createPack(data_packet_t *packet, header_t *header, int num_chunks, 
+void create_pack_helper(data_packet_t *packet, header_t *header, int num_chunks, 
   char chunks[][CHK_HASHLEN + 1]) {
 
   // Calculate the packet length
@@ -203,7 +186,7 @@ void create_iHave_packet(data_packet_t *hav_packet, int hav_num_chunks, char chu
    hav_header->header_len = sizeof(hav_header);
    hav_header->packet_type = IHAVE_TYPE;
 
-   helper_createPack(hav_packet, hav_header, hav_num_chunks, chunks);
+   create_pack_helper(hav_packet, hav_header, hav_num_chunks, chunks);
 } 
 
 void iHave_check(data_packet_t *packet, bt_config_t *config, struct sockaddr_in *from) {
@@ -265,6 +248,7 @@ void process_inbound_udp(int sock, bt_config_t *config) {
 	 inet_ntoa(from.sin_addr),
 	 ntohs(from.sin_port),
 	 buf); */ 
+<<<<<<< HEAD
    pack = (data_packet_t *)buf;
    // TODO: use a switch instead of an IF
    if (pack->header.packet_type == WHOHAS_TYPE) {
@@ -274,6 +258,32 @@ void process_inbound_udp(int sock, bt_config_t *config) {
    if(pack->header.packet_type == GET_TYPE) {
      upload(pack, config, &from);
    }                                             
+=======
+  pack = (data_packet_t *)buf;
+  switch (pack->header.packet_type) {
+    case WHOHAS_TYPE:
+      iHave_check(pack, config, &from);
+      break;
+    case IHAVE_TYPE:
+      printf("Received IHAVE packet.\n");
+      process_ihave(pack, config, &from);
+      break;
+    case GET_TYPE:
+      printf("Received GET packet.\n");
+      break;
+    case DATA_TYPE:
+      printf("Received DATA packet.\n");
+      break;
+    case ACK_TYPE:
+      printf("Received ACK packet.\n");
+      break;
+    case DENIED_TYPE:
+      printf("Received DENIED packet.\n");
+      break;
+    default:
+      printf("Packet type %d not understood.\n", pack->header.packet_type);
+  }
+>>>>>>> df9a181f4f5640dc6c126adb24ea3a4bbd3471a0
 } 
 
 void create_whohas_packet(data_packet_t *packet, int num_chunks, 
@@ -288,7 +298,7 @@ void create_whohas_packet(data_packet_t *packet, int num_chunks,
   header->header_len = sizeof(header); 
   header->packet_type = WHOHAS_TYPE;
   
-  helper_createPack(packet, header, num_chunks, chunks);
+  create_pack_helper(packet, header, num_chunks, chunks);
 }
 
 void process_get(char *chunkfile, char *outputfile, bt_config_t *config) {
