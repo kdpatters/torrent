@@ -8,11 +8,22 @@
 #define _CHUNK_H_
 #include <stdio.h>
 #include <inttypes.h>
+#include "bt_parse.h"
 
 #define BT_CHUNK_SIZE (512 * 1024)
+#define CHK_HASH_BYTES 20
+#define CHK_HASHLEN (CHK_HASH_BYTES * 2)
 
 #define ascii2hex(ascii,len,buf) hex2binary((ascii),(len),(buf))
 #define hex2ascii(buf,len,ascii) binary2hex((buf),(len),(ascii))
+
+typedef struct chunk_hash {
+  char hash[CHK_HASHLEN];
+  int id;
+  struct chunk_hash *next;
+} chunk_hash_t;
+
+int hash2id(char *, bt_config_t *);
 
 #ifdef __cplusplus
 extern "C" {

@@ -20,6 +20,7 @@
 #include "bt_parse.h"
 #include "input_buffer.h"
 #include "peer.h"
+#include "download.h"
 
 void peer_run(bt_config_t *config);
 
@@ -137,27 +138,6 @@ int parse_chunkfile(char *chunkfile, chunk_hash_t **chunklist) {
   return n_chunks;
 }
 
-void send_pack(data_packet_t *pack, struct sockaddr_in *dest, bt_config_t *config) {
-  //printf("sending pack\n");
-  // Create the socket
-  int sockfd = config->sock;
-  //if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-  //  perror("Could not create socket.");
-  //  exit(1);
-  //}
-  struct sockaddr_in myaddr;
-  memset(&myaddr, 0, sizeof(myaddr));
-  memcpy(&myaddr.sin_addr, &dest->sin_addr, sizeof(dest->sin_addr));
-  memcpy(&myaddr.sin_port, &dest->sin_port, sizeof(dest->sin_port));
-  myaddr.sin_family = AF_INET;
-
-  //send packet to peer requesting it
-      sendto(sockfd, pack, pack->header.packet_len, 0, 
-        (const struct sockaddr *) &myaddr, sizeof(myaddr));
-    //sendto(sockfd, &packetlist[i], packetlist[i].header.packet_len, 0, 
-   //     (const struct sockaddr *) &p->addr, sizeof(p->addr));
-  }
-
 void create_pack_helper(data_packet_t *packet, header_t *header, int num_chunks, 
   char chunks[][CHK_HASHLEN + 1]) {
 
@@ -267,6 +247,7 @@ void process_inbound_udp(int sock, bt_config_t *config) {
       break;
     case IHAVE_TYPE:
       printf("Received IHAVE packet.\n");
+      process_ihave(pack, config, &from);
       break;
     case GET_TYPE:
       printf("Received GET packet.\n");

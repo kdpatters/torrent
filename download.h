@@ -4,43 +4,50 @@
  */
 
 #include <time.h>
+#include "bt_parse.h"
+#include "packet.h"
+
 #define MAX_DOWNLOADS 1
+// Download statuses
+#define DLOAD_INVALID 0
+#define DLOAD_WAIT_IHAVE 1 // Waiting for IHAVE responses
+#define DLOAD_WAIT_DATA 2 // Waiting for data packets
+#define DLOAD_STALLED 3 // Download is unable to complete
+#define DLOAD_STOPPED 4 // Download has finished or user has stopped download
 
 typedef struct dll_node_s {
     int val;
-    struct dll_node_s prev;
-    struct dll_node_s next; 
+    struct dll_node_s *prev;
+    struct dll_node_s *next; 
 } dll_node_t;
 
 typedef struct ihave_list_s {
-  char hash[CHK_HASH_BYTES];
+  int chunk_id;
   bt_peer_t peers;
 } ihave_list_t;
 
-typedef struct chunk_download {
+typedef struct chunk_download_s {
   char hash[CHK_HASH_BYTES];
   void * data; // 512KB for chunk data
   dll_node_t pieces;
   clock_t last_received;
-}
+} chunk_download_t;
 
-typedef struct download_s {
-  ihave_list_t ihave_recv[]; // Array of hashes with linked list for peers with each
+typedef struct dload_s {
+  chunk_download_t chunk_download;
   clock_t time_started;
-  int state; // 0: invalid, 1: waiting for ihave, 2: waiting for data, 3: stalled, 4: stopped
-} download_t;
+  int state;
+  int ihave_recv_len;
+  ihave_list_t *ihave_recv; // Array of hashes with linked list for peers with each
+} dload_t;
 
 typedef struct downloads_s {
-    download_t downloads[MAX_DOWNLOADS];
+    dload_t downloads[MAX_DOWNLOADS];
     int n; // Number of concurrent downloads
 } downloads_t;
 
-char not_at_max_downloads();
-void begin_download(char hash[][MAX_HASH_BYTES]);
-void send_get();
-void check_retry_get();
-void process_data();
-void verify_chunk();
+void process_ihave(data_packet_t *packet, bt_config_t *config, 
+  struct sockaddr_in *from);
     
 // Function to get ID for a specific chunk HASH
 // Function to read a chunk based on its specific ID from a file; should
