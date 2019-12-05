@@ -12,7 +12,115 @@
 #include <string.h> // for memset
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
+=======
+void hash_nodes_to_list(chunk_hash_t *chunklist, int num_chunks, 
+  char hashes[][CHK_HASHLEN], int ids[]) {
+
+  // Convert linked list intro string array
+  chunk_hash_t *curr = chunklist;
+  for (int i = 0; i < num_chunks; i++) {
+    strncpy(hashes[i], curr->hash, CHK_HASHLEN);
+    chunk_hash_t *prev = curr;
+    curr = curr->next;
+    free(prev);
+  }
+}
+
+/* Creates a singly linked list, storing hash and ID */
+int parse_chunkfile(char *chunkfile, chunk_hash_t **chunklist) {
+  int n_chunks = 0;
+
+  // Open chunkfile
+  FILE *f;
+  f = fopen(chunkfile, "r");
+  if (f == NULL) {
+    fprintf(stderr, "Could not read chunkfile \"%s\".\n", chunkfile);
+    exit(1);
+  }
+
+  // Store data for individual chunk
+  int id;
+  char hash[CHK_HASHLEN];
+  chunk_hash_t *curr = NULL;
+
+  int buf_size = sizeof(int) + sizeof(' ') + CHK_HASHLEN;
+  char *buf = malloc(buf_size + 1);
+  // Read a line from the chunklist file
+  while (getline(&buf, (size_t *) &buf_size, f) > 0) {
+    if (strlen(buf) < CHK_HASHLEN + strlen("0 ")) {
+      fprintf(stderr, "Line \"%s\" in chunkfile \"%s\" was too short and could not be parsed.\n", 
+        buf, chunkfile);
+	  exit(-1);
+    }
+    // Attempt to parse ID and hash from current line in file
+    else {
+      buf[strcspn(buf, "\n")] = '\0'; 
+      int offset = strcspn(buf, " ");
+
+      // Parse ID
+      char num[offset];
+      strncpy(num, buf + offset - 1, sizeof(num));
+      num[offset++] = '\0';
+      id = atoi(num);
+
+      // Parse the hash
+      offset += strspn(buf + offset, " ");
+
+      if (offset >= buf_size) {
+        fprintf(stderr, "Could not parse both id and hash from line \"%s\" in chunkfile \"%s\".\n", 
+          buf, chunkfile);
+      }
+      else {
+        // Read the hash from the buffer
+        strcpy(hash, buf + offset);
+      }
+
+      if (strlen(hash) != CHK_HASHLEN) {
+        fprintf(stderr, "Expected hash \"%s\" to be of length %d.\n", hash, CHK_HASHLEN);
+      }
+      // Found correct number of arguments and of correct lengths, so allocate
+      // a new node 
+      else {
+        chunk_hash_t *new_node;
+        new_node = malloc(sizeof(chunk_hash_t));
+        assert(new_node != NULL);
+        memset(new_node, 0, sizeof(*new_node)); // Zero out the memory
+        strncpy(new_node->hash, hash, CHK_HASHLEN);
+        new_node->id = id;
+
+        if (curr == NULL) {
+          curr = new_node;
+          *chunklist = curr;
+        }
+        else {
+          curr->next = new_node;
+          curr = curr->next;
+        }
+        n_chunks++;
+      }
+    }
+  }
+  free(buf); // Since buf may have been reallocated by `getline`, free it
+  return n_chunks;
+}
+
+int parse_hashes_ids(char *chunkfile, char hashes[][CHK_HASHLEN], int ids[]) {
+  chunk_hash_t *chunklist = NULL; // Parse the chunkfile	
+  int num_chunks = parse_chunkfile(chunkfile, &chunklist);
+  hash_nodes_to_list(chunklist, num_chunks, hashes, ids);
+
+  // Create array of strings
+  hashes = malloc(num_chunks * (CHK_HASHLEN));
+  ids = malloc(num_chunks * sizeof(int));
+  memset(hashes, 0, sizeof(*hashes));
+  memset(ids, 0, sizeof(*ids));
+
+  return num_chunks;
+}
+
+>>>>>>> 6ee487ea7c13d87368f3ed3335c69a6e1972c4f3
 /*
  * Return the ID for a specific hash given as bytes.  If the ID is not
  * found, the function will return -1.

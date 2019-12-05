@@ -63,6 +63,7 @@ void bytes_to_hashstr(char instr[CHK_HASH_BYTES], char outstr[CHK_HASHLEN]) {
     sprintf(&outstr[i * 2], "%02hhx", instr[i]);
 }
 
+<<<<<<< HEAD
 /* Creates a singly linked list, storing hash and ID */
 int parse_chunkfile(char *chunkfile, chunk_hash_t **chunklist) {
   int n_chunks = 0;
@@ -142,6 +143,8 @@ int parse_chunkfile(char *chunkfile, chunk_hash_t **chunklist) {
   return n_chunks;
 }
 
+=======
+>>>>>>> 6ee487ea7c13d87368f3ed3335c69a6e1972c4f3
 void create_pack_helper(data_packet_t *packet, header_t *header, int num_chunks, 
   char chunks[][CHK_HASHLEN + 1]) {
 
@@ -302,22 +305,9 @@ void create_whohas_packet(data_packet_t *packet, int num_chunks,
 }
 
 void process_get(char *chunkfile, char *outputfile, bt_config_t *config) {
-  // Parse the chunkfile
-  chunk_hash_t *chunklist = NULL;
-  int num_chunks = parse_chunkfile(chunkfile, &chunklist);
-
-  // Create array of strings
-  char hashes[num_chunks][CHK_HASHLEN + 1];
-  memset(hashes, 0, sizeof(hashes));
-
-  // Convert linked list intro string array
-  chunk_hash_t *curr = chunklist;
-  for (int i = 0; i < num_chunks; i++) {
-    strncpy(hashes[i], curr->hash, CHK_HASHLEN);
-    chunk_hash_t *prev = curr;
-    curr = curr->next;
-    free(prev);
-  }
+  int *ids;
+  char *hashes[CHK_HASHLEN];
+  int num_chunks = parse_hashes_ids(chunkfile, hashes, ids);
    
   // Create an array of packets to store the chunk hashes
   int list_size = (num_chunks / MAX_CHK_HASHES) + \
