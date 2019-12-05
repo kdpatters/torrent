@@ -15,6 +15,12 @@
 #define DLOAD_STALLED 3 // Download is unable to complete
 #define DLOAD_STOPPED 4 // Download has finished or user has stopped download
 
+// Windows
+#define MS_TO_S 1000
+#define GET_WINDOW (MS_TO_S * 5)
+#define DATA_WINDOW (MS_TO_S * 5)
+#define MAX_RETRIES_GET 3
+
 typedef struct dll_node_s {
     int val;
     struct dll_node_s *prev;
@@ -23,21 +29,25 @@ typedef struct dll_node_s {
 
 typedef struct ihave_list_s {
   int chunk_id;
+  int n_peers;
   bt_peer_t peers;
 } ihave_list_t;
 
 typedef struct chunk_download_s {
   char hash[CHK_HASH_BYTES];
   void * data; // 512KB for chunk data
+  int peer_id; // Identity of peer that to download chunk from
   dll_node_t pieces;
-  clock_t last_received;
+  int n_tries_get;
+  clock_t last_get_sent;
+  clock_t last_data_recv;
 } chunk_download_t;
 
 typedef struct dload_s {
   chunk_download_t chunk_download;
   clock_t time_started;
   int state;
-  int ihave_recv_len;
+  int n_hashes;
   ihave_list_t *ihave_recv; // Array of hashes with linked list for peers with each
 } dload_t;
 
