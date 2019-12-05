@@ -15,37 +15,37 @@
 /* 
  * can_download
  * 
- * Check that client has not already begun the maximum number of downloads. 
+ * Check that client has not already begun to download the given chunk. 
  */
-char can_download(downloads_t *downloads) {
-  return downloads->n < MAX_DOWNLOADS;
-}
+//char can_download(download_t *download) {
+//   return downloads->n < MAX_DOWNLOADS;
+// }
 
 /*
- * ready_download_slots
+ * ready_download
  * 
- * Initialize the struct to track downloads.
+ * Initialize the download.
  */
-void ready_download_slots(downloads_t downloads) {
-    memset(&downloads, 0, sizeof(downloads));
-}
+// void ready_download(download_t download) {
+//     memset(&download, 0, sizeof(download));
+// }
 
-/* 
- * find_first_empty
- * 
- * Find and return the index of the first empty download slot.
- */
-int find_first_empty(downloads_t *downloads) {
-    int i = 0;
-    for (; downloads->downloads[i].state; i++) {
-        if (i >= MAX_DOWNLOADS - 1) {
-            fprintf(stderr, "Attempted to add a new download when max \
-downloads exceeded.\n");
-            exit(-1);
-        }
-    }
-    return i;
-}
+// /* 
+//  * download_next_chunk
+//  * 
+//  * Find and return the index of the next chunk to download.
+//  */
+// int download_next_chunk(download_t *download) {
+//     int i = 0;
+//     for (; download->chunk_download[i].state; i++) {
+//         if (i >= MAX_DOWNLOADS - 1) {
+//             fprintf(stderr, "Attempted to add a new download when max 
+// downloads exceeded.\n");
+//             exit(-1);
+//         }
+//     }
+//     return i;
+// }
 
 /*
  * create_get_packet
@@ -66,9 +66,9 @@ void send_get(struct sockaddr_in *dest, char hash[CHK_HASH_BYTES],
     send_pack(&pack, dest, config); // Send the GET packet
 }
 
-void begin_download() {
-    // DO SOMETHING...
-}
+// void begin_download() {
+//     // DO SOMETHING...
+// }
 
 /* 
  * init_download
@@ -76,21 +76,20 @@ void begin_download() {
  * Initialize the struct to keep track of the chunks and connected peers for the
  * specific download.
  */
-void init_download(char hash[][CHK_HASH_BYTES], int n_hashes, 
-    downloads_t *downloads, bt_config_t *config) {
+void init_download(char hash[][CHK_HASH_BYTES], int n_chunks, 
+    download_t *download, bt_config_t *config) {
     
     // Get a pointer to the first empty download
-    dload_t *curr = &(downloads->downloads)[find_first_empty(downloads)];
-    curr->ihave_recv = malloc(sizeof(ihave_list_t) * n_hashes);
-    curr->n_hashes = n_hashes;
-    for (int i = 0; i < n_hashes; i++) {
+    download->ihave_recv = malloc(sizeof(ihave_list_t) * n_chunks);
+    download->n_chunks = n_chunks;
+    for (int i = 0; i < n_chunks; i++) {
         // Get and store hash ID
-        curr->ihave_recv[i].chunk_id = hash2id(hash[i], config);
+        download->ihave_recv[i].chunk_id = hash2id(hash[i], config);
     }
 
     // Officially start the download
-    curr->state = DLOAD_WAIT_IHAVE;
-    curr->time_started = clock();
+    download->state = DLOAD_WAIT_IHAVE;
+    download->time_started = clock();
 }
 
 void process_ihave(data_packet_t *packet, bt_config_t *config, 
@@ -114,7 +113,7 @@ void process_ihave(data_packet_t *packet, bt_config_t *config,
         // THIS NEEDS A LOT OF WORK; TODO
         // Try to match returned hash to requested one and store peer identity
         //int id = hash2id(hash, config);
-        //for (int j = 0; j < downloads[0].n_hashes; j++) {
+        //for (int j = 0; j < downloads[0].n_chunks; j++) {
         //    if (downloads[0].ihave_recv[j].chunk_id == id) {
                 // Add peer to peer list
                 //add_peer(downloads[0].ihave_recv[j].peers, SOMETHING);
@@ -180,16 +179,25 @@ void send_ack(struct sockaddr_in *dest, int ack_num, bt_config_t *config) {
 }
 
 /*
- * process_data
- */
-void process_data() {
-    // Store data in chunk download struct
-}
-
-/*
  * verify_chunk
  */
 void verify_chunk() {
     // Generate hash for chunk data
     // Compare generated hash to current hash
+}
+
+/*
+ * is_chunk_done
+ * 
+ * Returns a boolean for whether the given chunk has been downloaded entirely.
+//  */
+// char is_chunk_done() {
+
+// }
+
+/*
+ * process_data
+ */
+void process_data() {
+    // Store data in chunk download struct
 }
