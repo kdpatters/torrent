@@ -59,85 +59,6 @@ void bytes_to_hashstr(char instr[CHK_HASH_BYTES], char outstr[CHK_HASHLEN]) {
     sprintf(&outstr[i * 2], "%02hhx", instr[i]);
 }
 
-/* Creates a singly linked list, storing hash and ID */
-int parse_chunkfile(char *chunkfile, chunk_hash_t **chunklist) {
-  int n_chunks = 0;
-
-  // Open chunkfile
-  FILE *f;
-  f = fopen(chunkfile, "r");
-  if (f == NULL) {
-    fprintf(stderr, "Could not read chunkfile \"%s\".\n", chunkfile);
-    exit(1);
-  }
-
-  // Store data for individual chunk has
-  int id;
-  char hash[CHK_HASHLEN];
-
-  // Zero out the chunklist
-  chunk_hash_t *curr = NULL;
-
-  int buf_size = MAX_LINE;
-  char *buf = malloc(buf_size + 1);
-  // Read a line from the chunklist file
-  while (getline(&buf, (size_t *) &buf_size, f) > 0) {
-    if (strlen(buf) < CHK_HASHLEN + strlen("0 ")) {
-      fprintf(stderr, "Line \"%s\" in chunkfile \"%s\" was too short and could not be parsed.\n", 
-        buf, chunkfile);
-    }
-    // Attempt to parse ID and hash from current line in file
-    else {
-      buf[strcspn(buf, "\n")] = '\0'; 
-      int offset = strcspn(buf, " ");
-
-      // Parse ID
-      char num[offset];
-      strncpy(num, buf + offset - 1, sizeof(num));
-      num[offset++] = '\0';
-      id = atoi(num);
-
-      // Parse the hash
-      offset += strspn(buf + offset, " ");
-
-      if (offset >= buf_size) {
-        fprintf(stderr, "Could not parse both id and hash from line \"%s\" in chunkfile \"%s\".\n", 
-          buf, chunkfile);
-      }
-      else {
-        // Read the hash from the buffer
-        strcpy(hash, buf + offset);
-      }
-
-      if (strlen(hash) != CHK_HASHLEN) {
-        fprintf(stderr, "Expected hash \"%s\" to be of length %d.\n", hash, CHK_HASHLEN);
-      }
-      // Found correct number of arguments and of correct lengths, so allocate
-      // a new node 
-      else {
-        chunk_hash_t *new_node;
-        new_node = malloc(sizeof(chunk_hash_t));
-        assert(new_node != NULL);
-        memset(new_node, 0, sizeof(*new_node)); // Zero out the memory
-        strncpy(new_node->hash, hash, CHK_HASHLEN);
-        new_node->id = id;
-
-        if (curr == NULL) {
-          curr = new_node;
-          *chunklist = curr;
-        }
-        else {
-          curr->next = new_node;
-          curr = curr->next;
-        }
-        n_chunks++;
-      }
-    }
-  }
-  free(buf); // Since buf may have been reallocated by `getline`, free it
-  return n_chunks;
-}
-
 void create_pack_helper(data_packet_t *packet, header_t *header, int num_chunks, 
   char chunks[][CHK_HASHLEN + 1]) {
 
@@ -282,22 +203,9 @@ void create_whohas_packet(data_packet_t *packet, int num_chunks,
 }
 
 void process_get(char *chunkfile, char *outputfile, bt_config_t *config) {
-  // Parse the chunkfile
-  chunk_hash_t *chunklist = NULL;
-  int num_chunks = parse_chunkfile(chunkfile, &chunklist);
-
-  // Create array of strings
-  char hashes[num_chunks][CHK_HASHLEN + 1];
-  memset(hashes, 0, sizeof(hashes));
-
-  // Convert linked list intro string array
-  chunk_hash_t *curr = chunklist;
-  for (int i = 0; i < num_chunks; i++) {
-    strncpy(hashes[i], curr->hash, CHK_HASHLEN);
-    chunk_hash_t *prev = curr;
-    curr = curr->next;
-    free(prev);
-  }
+  int *ids;
+  char *hashes[CHK_HASHLEN];
+  int num_chunks = parse_hashes_ids(chunkfile, hashes, ids);
    
   // Create an array of packets to store the chunk hashes
   int list_size = (num_chunks / MAX_CHK_HASHES) + \

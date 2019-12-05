@@ -24,6 +24,8 @@ typedef struct chunk_hash {
 } chunk_hash_t;
 
 int hash2id(char *, bt_config_t *);
+int parse_chunkfile(char *chunkfile, chunk_hash_t **chunklist);
+int parse_hashes_ids(char *chunkfile, char hashes[][CHK_HASHLEN], int ids[]);
 
 #ifdef __cplusplus
 extern "C" {
