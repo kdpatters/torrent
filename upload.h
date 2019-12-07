@@ -16,21 +16,13 @@
 #define SEQ_NUM 0
 #define ACK_NUM 0
  
- // Each data node includes its sequence number and a pointer to a byte array
-typedef struct data_node_s {
-    int seq_num;
-    int data_len;
-    data_packet_t *data;
-    struct data_node_s *prev;
-    struct data_node_s *next; 
-} data_node_t;
 
 typedef struct chunkd_s {
   // Chunk info
     int chunk_id;
     char hash[CHK_HASH_BYTES];
 
-  // Chunk download status
+  // Chunk upload status
     int state;
     int peer_id;
     int n_tries_get;
@@ -39,7 +31,7 @@ typedef struct chunkd_s {
   
   // Data
     char data[BT_CHUNK_SIZE]; // Space reserved for entire chunk
-    data_node_t piece;
+    data_packet_t *packetlist;
 } chunkd_t;
 
  typedef struct upload {

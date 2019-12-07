@@ -168,3 +168,109 @@ void bt_dump_config(bt_config_t *config) {
   for (p = config->peers; p; p = p->next) 
     printf("  peer %d: %s:%d\n", p->id, inet_ntoa(p->addr.sin_addr), ntohs(p->addr.sin_port));
 }
+
+int parse_Master_chunkfile (char *chunkfile, chunk_hash_t **m_chunklist) {
+
+    int n_chunks = 0;
+    // Open chunkfile
+    FILE *f;
+    f = fopen(chunkfile, "r");
+    if (f == NULL) {
+        fprintf(stderr, "Could not read chunkfile \"%s\".\n", chunkfile);
+        exit(1);
+    }
+
+    // Store data for individual chunk hash
+    int id;
+    char hash[CHK_HASHLEN];
+
+    // Zero out the chunklist
+    chunk_hash_t *curr = NULL;
+
+    int buf_size = MAX_LINE;
+    char *buf = malloc(buf_size + 1);
+    int cur_line = 0;
+
+    char fname[MAX_FILENAME];
+    memset(fname, 0, sizeof(fname));
+
+    // Read a line from the chunklist file
+  while (getline(&buf, (size_t *) &buf_size, f) > 0) {
+    if(cur_line == 0) {
+      int char_indx = strcspn(buf, " ");
+      while (char_indx < strlen(buf)) {
+        if (buf[char_indx] == ' ')
+          char_indx++;
+        else {
+          strncpy(fname, buf, MAX_FILENAME);
+          if(fname[MAX_FILENAME - 1] != '\0') {
+            fprintf(stderr, "Filename for Datafile in masterchunkfile is too long.\n");
+            exit(1);
+          }
+          break;
+          
+        }
+
+      }
+    }
+
+
+    while(cur_line >= 2) { //read 3rd line
+        if (strlen(buf) < CHK_HASHLEN + strlen("0 ")) {
+        fprintf(stderr, "Line \"%s\" in chunkfile \"%s\" was too short and could not be parsed.\n", 
+            buf, chunkfile);
+        }
+        // Attempt to parse ID and hash from current line in file
+        else {
+            buf[strcspn(buf, "\n")] = '\0'; 
+            int offset = strcspn(buf, " ");
+
+            // Parse ID
+            char num[offset];
+            strncpy(num, buf + offset - 1, sizeof(num));
+            num[offset++] = '\0';
+            id = atoi(num);
+
+            // Parse the hash
+            offset += strspn(buf + offset, " ");
+
+            if (offset >= buf_size) {
+                fprintf(stderr, "Could not parse both id and hash from line \"%s\" in chunkfile \"%s\".\n", 
+                buf, chunkfile);
+            }
+            else {
+                // Read the hash from the buffer
+                strcpy(hash, buf + offset);
+            }
+
+            if (strlen(hash) != CHK_HASHLEN) {
+                fprintf(stderr, "Expected hash \"%s\" to be of length %d.\n", hash, CHK_HASHLEN);
+            }
+            // Found correct number of arguments and of correct lengths, so allocate
+            // a new node 
+            else {
+                chunk_hash_t *new_node;
+                new_node = malloc(sizeof(chunk_hash_t));
+                assert(new_node != NULL);
+                memset(new_node, 0, sizeof(*new_node)); // Zero out the memory
+                strncpy(new_node->hash, hash, CHK_HASHLEN);
+                new_node->id = id;
+
+                if (curr == NULL) {
+                curr = new_node;
+                *m_chunklist = curr;
+                }
+                else {
+                curr->next = new_node;
+                curr = curr->next;
+                }
+                n_chunks++;
+            }
+        }
+        cur_line++;
+    }
+  }
+  fclose(f); //close the file
+  free(buf); // Since buf may have been reallocated by `getline`, free it
+  return n_chunks;
+}
