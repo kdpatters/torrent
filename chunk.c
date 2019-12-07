@@ -11,6 +11,10 @@
 #include <stdlib.h> // for malloc
 #include <string.h> // for memset
 
+<<<<<<< HEAD
+<<<<<<< HEAD
+=======
+=======
 void hash_nodes_to_list(chunk_hash_t *chunklist, int num_chunks, 
   char *hashes, int ids[]) {
 
@@ -117,6 +121,7 @@ int parse_hashes_ids(char *chunkfile, char *hashes, int ids[]) {
   return num_chunks;
 }
 
+>>>>>>> 6ee487ea7c13d87368f3ed3335c69a6e1972c4f3
 /*
  * Return the ID for a specific hash given as bytes.  If the ID is not
  * found, the function will return -1.
@@ -132,6 +137,7 @@ int hash2id(char *hash, chunk_hash_t *chunklist) {
     }
 	return -1;
 }
+>>>>>>> df9a181f4f5640dc6c126adb24ea3a4bbd3471a0
 
 /**
  * fp -- the file pointer you want to chunkify.

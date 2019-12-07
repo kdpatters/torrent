@@ -19,6 +19,8 @@
 #include "spiffy.h"
 #include "input_buffer.h"
 #include "peer.h"
+#include "upload.h"
+#include "download.h"
 
 void peer_run(bt_config_t *config);
 
@@ -145,7 +147,11 @@ void iHave_check(data_packet_t *packet, bt_config_t *config, struct sockaddr_in 
   }
 }
 
-void process_inbound_udp(int sock, server_state_t *state) {
+void upload(data_packet_t pack, config_t config, struct sock_in_addr *addr) {
+
+ }
+
+void process_inbound_udp(int sock, bt_config_t *config) {
   data_packet_t *pack;
   struct sockaddr_in from;
   socklen_t fromlen;
@@ -164,6 +170,7 @@ void process_inbound_udp(int sock, server_state_t *state) {
   pack = (data_packet_t *)buf;
   switch (pack->header.packet_type) {
     case WHOHAS_TYPE:
+      printf("Received WHOHAS packet.\n");
       iHave_check(pack, config, &from);
       break;
     case IHAVE_TYPE:
@@ -172,6 +179,7 @@ void process_inbound_udp(int sock, server_state_t *state) {
       break;
     case GET_TYPE:
       printf("Received GET packet.\n");
+      upload(pack, config, &from);
       break;
     case DATA_TYPE:
       printf("Received DATA packet.\n");
