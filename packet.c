@@ -4,6 +4,7 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include "packet.h"
 #include "bt_parse.h"
 
@@ -19,14 +20,14 @@ void init_packet(data_packet_t *pack, char pack_type, int seq_num, int ack_num,
     // Calculate the packet length
     short packet_len = sizeof(header_t) + payload_len;
     if (packet_len > PACKETLEN) {
-        perror("Something went wrong: constructed packet is longer than the \
+        fprintf(stderr, "Something went wrong: constructed packet is longer than the \
 maximum possible length.");
-        exit(1);
+        exit(-1);
     }
     else if (packet_len <= 0) {
-        perror("Something went wrong: constructed packet has a \
+        fprintf(stderr, "Something went wrong: constructed packet has a \
 non-positive length.");
-        exit(1); 
+        exit(-1); 
     }
 
     // Create the header

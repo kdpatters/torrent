@@ -17,10 +17,8 @@
 #include <math.h>
 #include "debug.h"
 #include "spiffy.h"
-#include "bt_parse.h"
 #include "input_buffer.h"
 #include "peer.h"
-#include "download.h"
 
 void peer_run(bt_config_t *config);
 
@@ -48,19 +46,20 @@ int main(int argc, char **argv) {
   peer_run(&config);
   return 0;
 }
-//to convert chunk hashes from string format to actual hexadecimal bytes 
+
+// Convert chunk hashes from string format to actual hexadecimal bytes 
 void hashstr_to_bytes(char instr[CHK_HASHLEN], char outstr[CHK_HASH_BYTES]) {
   for (int i = 0; i < CHK_HASH_BYTES; i++)
     sscanf(&instr[i * 2], "%2hhx", &outstr[i]);
 }
-//hash bytes back to string 
+// Convert hash bytes back to string 
 void bytes_to_hashstr(char instr[CHK_HASH_BYTES], char outstr[CHK_HASHLEN]) {
   for (int i = 0; i < CHK_HASH_BYTES; i++)
     sprintf(&outstr[i * 2], "%02hhx", instr[i]);
 }
 
 void create_pack_helper(data_packet_t *packet, header_t *header, int num_chunks, 
-  char chunks[][CHK_HASHLEN + 1]) {
+  char chunks[][CHK_HASHLEN]) {
 
   // Calculate the packet length
   // Use num_chunks + 1 to include padding and chunk count at start
@@ -93,7 +92,7 @@ void create_pack_helper(data_packet_t *packet, header_t *header, int num_chunks,
   }
 }
 
-void create_iHave_packet(data_packet_t *hav_packet, int hav_num_chunks, char chunks[][CHK_HASHLEN + 1]) {
+void create_iHave_packet(data_packet_t *hav_packet, int hav_num_chunks, char chunks[][CHK_HASHLEN]) {
    memset(hav_packet, 0, sizeof(*hav_packet));
 
    //Create IHAVE header
@@ -115,14 +114,14 @@ void iHave_check(data_packet_t *packet, bt_config_t *config, struct sockaddr_in 
     int num_chunks = *curr_pack_ch; //dereference to get stored number of chunks in packet
 
     curr_pack_ch += PADDING + CHK_COUNT; //get to the start of chunk of hashes
-    char matched[MAX_CHK_HASHES][CHK_HASHLEN + 1];
+    char matched[MAX_CHK_HASHES][CHK_HASHLEN];
     int m_point = 0;
 
     data_packet_t newpack; 
     
     for(int i = 0; i < num_chunks; i++) { //for each chunk in packet
       chunk_hash_t *curr_ch = chunklist;
-      char compare[CHK_HASHLEN + 1]; 
+      char compare[CHK_HASHLEN]; 
       memset(compare, 0, sizeof(compare));
       bytes_to_hashstr(curr_pack_ch + i * CHK_HASH_BYTES, compare);
       for(int j = 0; j < n_chunks; j++) { //each chunk in has_chunk_file
@@ -146,11 +145,12 @@ void iHave_check(data_packet_t *packet, bt_config_t *config, struct sockaddr_in 
   }
 }
 
-void process_inbound_udp(int sock, bt_config_t *config) {
+void process_inbound_udp(int sock, server_state_t *state) {
   data_packet_t *pack;
   struct sockaddr_in from;
   socklen_t fromlen;
   char buf[PACKETLEN];
+  bt_config_t *config = &state->config;
 
   fromlen = sizeof(from);
   spiffy_recvfrom(sock, buf, PACKETLEN, 0, (struct sockaddr *) &from, &fromlen);
@@ -188,7 +188,7 @@ void process_inbound_udp(int sock, bt_config_t *config) {
 } 
 
 void create_whohas_packet(data_packet_t *packet, int num_chunks, 
-  char chunks[][CHK_HASHLEN + 1]) {
+  char chunks[][CHK_HASHLEN]) {
 
   memset(packet, 0, sizeof(*packet));
 
@@ -202,11 +202,12 @@ void create_whohas_packet(data_packet_t *packet, int num_chunks,
   create_pack_helper(packet, header, num_chunks, chunks);
 }
 
-void process_get(char *chunkfile, char *outputfile, bt_config_t *config) {
+void process_get(char *chunkfile, char *outputfile, server_state_t *state) {
   int *ids;
   char *hashes[CHK_HASHLEN];
   int num_chunks = parse_hashes_ids(chunkfile, hashes, ids);
-   
+  bt_config_t *config = &state->config;
+  
   // Create an array of packets to store the chunk hashes
   int list_size = (num_chunks / MAX_CHK_HASHES) + \
     ((num_chunks % MAX_CHK_HASHES) != 0);
@@ -230,17 +231,20 @@ void process_get(char *chunkfile, char *outputfile, bt_config_t *config) {
           send_pack(&packetlist[i], &p->addr, config); 
     }
   }
+
+  free(hashes);
+  free(ids);
 }
 
 void handle_user_input(char *line, void *cbdata) {
   char chunkf[128], outf[128];
-  bt_config_t *config = (bt_config_t *) cbdata;
+  server_state_t *state = (server_state_t *) cbdata;
 
   bzero(chunkf, sizeof(chunkf));
   bzero(outf, sizeof(outf));
   if (sscanf(line, "GET %120s %120s", chunkf, outf)) {
     if (strlen(outf) > 0) {
-      process_get(chunkf, outf, config);
+      process_get(chunkf, outf, state);
     }
   }
 }
@@ -270,8 +274,13 @@ void peer_run(bt_config_t *config) {
     perror("peer_run could not bind socket");
     exit(-1);
   }
-   
-  config->sock = sock; // Set socket 
+
+  // Initialize server state
+  config->sock = sock; // Set socket
+  server_state_t state;
+  memset(&state, 0, sizeof(state));
+  memcpy(&state.config, config, sizeof(*config));
+  
   spiffy_init(config->identity, (struct sockaddr *)&myaddr, sizeof(myaddr));
   
   while (1) {
@@ -283,11 +292,11 @@ void peer_run(bt_config_t *config) {
     
     if (nfds > 0) {
       if (FD_ISSET(sock, &readfds)) {
-	process_inbound_udp(sock, config);
+	process_inbound_udp(sock, &state);
       }
       
       if (FD_ISSET(STDIN_FILENO, &readfds)) {
-	process_user_input(STDIN_FILENO, userbuf, handle_user_input, config);
+	process_user_input(STDIN_FILENO, userbuf, handle_user_input, &state);
       }
     }
   }
