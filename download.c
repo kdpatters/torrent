@@ -39,6 +39,22 @@ char dload_peer_add(download_t *download, struct sockaddr_in peer, int chunk_id)
     return 0;                                                              
 }    
 
+/* Start the download process as a result of the GET command. */
+void dload_start(download_t *download, char *hashes, int *ids, 
+  int n_hashes) {
+  
+  // Start the download timer
+  download->time_started = clock();
+
+  download->chunks = malloc(sizeof(*download->chunks) * n_hashes);
+  for (int i = 0; i < n_hashes; i++) {
+    chunkd_t *chk = &download->chunks[i];
+    chk->chunk_id = ids[i];
+    strncpy(chk->hash, &hashes[i], CHK_HASH_BYTES);
+    chk->state = WAIT_IHAVE;
+  }
+}
+
 /* 
  * can_download
  * 

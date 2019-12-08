@@ -68,3 +68,4 @@ typedef struct download_s {
 } download_t;
 
 char dload_peer_add(download_t *download, struct sockaddr_in peer, int chunk_id);
+void dload_start(download_t *, char *, int *, int);

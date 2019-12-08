@@ -1,8 +1,6 @@
 /*
  * peer.c
  *
- * Skeleton for CMPU-375 programming project #2.
- *
  */
 
 #include <sys/types.h>
@@ -113,8 +111,8 @@ void cmd_get(char *chunkf, char *outputf, server_state_t *state) {
   // Flood the network
   flood_peers(packet_list, n_packets, state);
 
-  // Start the download timer and initialize chunks
-  // TODO
+  // Start the download process
+  dload_start(&state->download, hashes, ids, n_hashes);
 
   free(hashes);
   free(ids);
