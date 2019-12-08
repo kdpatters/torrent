@@ -196,14 +196,14 @@ int parse_Master_chunkfile (char *chunkfile, chunk_hash_t **m_chunklist) {
 
     // Read a line from the chunklist file
   while (getline(&buf, (size_t *) &buf_size, f) > 0) {
-    if(cur_line == 0) {
-      int char_indx = strcspn(buf, " ");
-      while (char_indx < strlen(buf)) {
-        if (buf[char_indx] == ' ')
+    if(cur_line == 0) { //first line
+      int char_indx = strcspn(buf, " "); //return no. of bytes before space found
+      while (char_indx < strlen(buf)) { 
+        if (buf[char_indx] == ' ') //we hit space, increase pointer to start of name
           char_indx++;
         else {
           strncpy(fname, buf, MAX_FILENAME);
-          if(fname[MAX_FILENAME - 1] != '\0') {
+          if(fname[MAX_FILENAME - 1] != '\0') { //filename more than MAX_FILENAME size 
             fprintf(stderr, "Filename for Datafile in masterchunkfile is too long.\n");
             exit(1);
           }

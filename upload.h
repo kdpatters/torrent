@@ -31,7 +31,7 @@ typedef struct chunkd_s {
   
   // Data
     char data[BT_CHUNK_SIZE]; // Space reserved for entire chunk
-    data_packet_t *packetlist;
+    data_packet_t *packetlist; //list of packets from each chunk
 } chunkd_t;
 
  typedef struct upload {

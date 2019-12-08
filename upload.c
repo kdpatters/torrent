@@ -23,16 +23,14 @@ void uploading(data_packet_t pack, config_t config, struct sock_in_addr *addr) {
     int id = hash_to_id(upload->chunk->hash, config);
     upload->chunk->chunk_id = id;
     //read first line from config->chunkfile to get filename 
-
-    read_chunk(upload, filename, addr, config);
-    chunk_hash_t **chunklist;
-    parse_Master_chunkfile(config->chunkfile, chunklist);
+    char *f_name = parse_Master_chunkfile(config->chunkfile, chunklist);
+    read_chunk(upload, f_name, addr, config);
 
 }
 
 
 // Function to read a chunk based on its specific ID from a file;
-void read_chunk(upload_t upload, char *filename, struct sock_in_addr *addr, bt_config_t *config) {
+void read_chunk(upload_t upload, char *filename, struct sock_in_addr *address, bt_config_t *confg) {
     // Open chunkfile
     FILE *f;
     f = fopen(filename, "r");
@@ -51,12 +49,12 @@ void read_chunk(upload_t upload, char *filename, struct sock_in_addr *addr, bt_c
     int whence = SEEK_SET;
     while (fseek(f, buf_size, whence) == 0)(
         fread(buf, BT_CHUNK_SIZE, f);
-        make_packets(upload, buf, buf_size, addr, config);
+        make_packets(upload, buf, buf_size, address, confg);
     )
 }
 
 //making packets after reading chunk
-void make_packets(upload_t upload, char* buf, int buf_size, struct sock_in_addr *addr, bt_config_t *config {
+void make_packets(upload_t upload, char* buf, int buf_size, struct sock_in_addr *add, bt_config_t *conf {
     int listsize = buf_size / DATALEN;
     double rem = buf_size % DATALEN;
     data_packet_t *packs[listsize][PACKETLEN]; //array of packets to be created
@@ -75,33 +73,32 @@ void make_packets(upload_t upload, char* buf, int buf_size, struct sock_in_addr 
         create_data_wrap(&packs[listsize - 1], mem_curr, rem); //create the last data packet
         upload->chunk->packetlist = packs;
         u_int sequence = packs[0]->seq_num;
-        send_data(upload, sequence, listsize, addr, config);  //send packetlist
+        send_data(upload, sequence, listsize, add, conf);  //send packetlist
     
 }
 
-char check_upload_peer(upload_t upload, bt_config_t config) {
+char check_upload_peer(upload_t upload, bt_config_t cfg) {
     bt_peer_t *p;
-    boolean check = false;
-    for (p = config->peers; p != NULL; p = p->next) {  // Iterate through peers
+    for (p = cfg->peers; p != NULL; p = p->next) {  // Iterate through peers
 
         if (p->id != upload->chunk->peer_id) { 
             continue;
         }
         else {
-            check = true;
+            return 1;
         }
     }
-    return check;
+    return -1;
 }
 
 
-send_data (upload_t upload, u_int sequence, int l_size, struct sockaddr_in_addr *addr, bt_config_t *config) {
+send_data (upload_t upload, u_int sequence, int l_size, struct sockaddr_in_addr *addr_, bt_config_t *cf) {
     
     data_node_t *curr = upload->chunk->packetlist;
     
     for(int i = 0; i < l_size; i++) {
         if(curr->seq_num = sequence) {
-            send_pack(curr->data, addr, config);
+            send_pack(curr->data, addr_, cf);
         }
     }
 }
@@ -115,27 +112,27 @@ void create_data_wrap(data_packet_t *pack, char *payload, int payload_len) {
 }
 
 // Check when the last data packet was received
-void check_retry_ack(upload_t *upload, int seq, struct sockaddr_in *dest, bt_config_t *config) {
+void check_retry_ack(upload_t *upload, int seq, struct sockaddr_in *dest, bt_config_t *co) {
 
     clock_t curr_time;
     curr_time = clock();
     clock_t last_rec = upload->last_ack_rec;
     
     if((curr_time - last_rec) > TIMEOUT_ACK) {
-        send_data(upload, seq, dest, config); //if not ack received
+        send_data(upload, seq, dest, co); //if not ack received
     }
 
 }
-data_packet_t create_ack_wrap(data_packet_t ack_pack, char* payload, int payload_len) {
+data_packet_t create_ack_wrap(data_packet_t ack_pack, char* payld, int payld_len) {
     ack_pack->ack_num = ACK_NUM;
     int ack_n = ACK_NUM;
-    init_packet(ack_pack, ACK_TYPE, 0, ack_n, payload, payload_len);
+    init_packet(ack_pack, ACK_TYPE, 0, ack_n, payld, payld_len);
     ACK_NUM++;
 }
 
-void send_ack(data_packet_t ack, struct sockaddr_in *dest, bt_config_t *config) {
+void send_ack(data_packet_t ack, struct sockaddr_in *desti, bt_config_t *cg) {
     data_packet_t created_ack =  create_ack_packet(ack);
-    send_pack(created_ack, sizeof(created_ack), dest, config);
+    send_pack(created_ack, sizeof(created_ack), desti, cg);
 }
 
 
