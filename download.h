@@ -4,8 +4,6 @@
  */
 
 #include <time.h>
-#include "packet.h"
-#include "chunk.h"
 
 #define MAX_DOWNLOADS 1
 
@@ -61,5 +59,3 @@ typedef struct download_s {
   char *output_file[MAX_FILENAME];
 } download_t;
 
-void process_ihave(data_packet_t *packet, bt_config_t *config, 
-  struct sockaddr_in *from);

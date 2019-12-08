@@ -8,7 +8,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
-#include "peer.h"
 
 #define INVALID_FIELD 0
 
@@ -41,30 +40,30 @@
 //         if (i >= MAX_DOWNLOADS - 1) {
 //             fprintf(stderr, "Attempted to add a new download when max 
 // downloads exceeded.\n");
-//             exit(-1);
+//             exit(1);
 //         }
 //     }
 //     return i;
 // }
 
-/*
- * create_get_packet
- */
-void create_get_packet(data_packet_t *pack, char hash[CHK_HASH_BYTES]) {
-    init_packet(pack, GET_TYPE, INVALID_FIELD, INVALID_FIELD, hash, 
-        CHK_HASH_BYTES);
-}
+// /*
+//  * create_get_packet
+//  */
+// void create_get_packet(data_packet_t *pack, char hash[CHK_HASH_BYTES]) {
+//     init_packet(pack, GET_TYPE, INVALID_FIELD, INVALID_FIELD, hash, 
+//         CHK_HASH_BYTES);
+// }
 
-/*
- * send_get 
- */
-void send_get(struct sockaddr_in *dest, char hash[CHK_HASH_BYTES], 
-    bt_config_t *config) {
+// /*
+//  * send_get 
+//  */
+// void send_get(struct sockaddr_in *dest, char hash[CHK_HASH_BYTES], 
+//     bt_config_t *config) {
 
-    data_packet_t pack;
-    create_get_packet(&pack, hash); // Create the GET packet
-    send_pack(&pack, dest, config); // Send the GET packet
-}
+//     data_packet_t pack;
+//     create_get_packet(&pack, hash); // Create the GET packet
+//     send_pack(&pack, dest, config); // Send the GET packet
+// }
 
 // void begin_download() {
 //     // DO SOMETHING...
@@ -92,120 +91,120 @@ void send_get(struct sockaddr_in *dest, char hash[CHK_HASH_BYTES],
 //     download->time_started = clock();
 // }
 
-void process_ihave(data_packet_t *packet, bt_config_t *config, 
-    struct sockaddr_in *from) {
+// void process_ihave(data_packet_t *packet, bt_config_t *config, 
+//     struct sockaddr_in *from) {
 
-    int inc = CHK_HASH_BYTES; // Amount to increment offset by
-    // Store the length of the packet
-    int pack_len = packet->header.packet_len;
-    int max_offset = pack_len - inc;
+//     int inc = CHK_HASH_BYTES; // Amount to increment offset by
+//     // Store the length of the packet
+//     int pack_len = packet->header.packet_len;
+//     int max_offset = pack_len - inc;
 
-    // Parse the number of chunks in the file
-    int n_chunks;
-    memcpy(&n_chunks, packet->data, CHK_COUNT);
+//     // Parse the number of chunks in the file
+//     int n_chunks;
+//     memcpy(&n_chunks, packet->data, CHK_COUNT);
 
-    int offset = CHK_COUNT + PADDING;
-    char hash[inc]; // Temporary variable to store hash
-    for (int i = 0; i < n_chunks; i++) {
-        if (offset > max_offset) {
-            fprintf(stderr, "Parsed %d chunk hashes from IHAVE but expected %d.",
-            i + 1, n_chunks);
-            exit(-1);
-        }
-        // Read and store the next hash
-        memcpy(hash, packet->data + offset, inc);
+//     int offset = CHK_COUNT + PADDING;
+//     char hash[inc]; // Temporary variable to store hash
+//     for (int i = 0; i < n_chunks; i++) {
+//         if (offset > max_offset) {
+//             fprintf(stderr, "Parsed %d chunk hashes from IHAVE but expected %d.",
+//             i + 1, n_chunks);
+//             exit(1);
+//         }
+//         // Read and store the next hash
+//         memcpy(hash, packet->data + offset, inc);
 
-        // THIS NEEDS A LOT OF WORK; TODO
-        // Try to match returned hash to requested one and store peer identity
-        //int id = hash2id(hash, config);
-        //for (int j = 0; j < downloads[0].n_chunks; j++) {
-        //    if (downloads[0].ihave_recv[j].chunk_id == id) {
-                // Add peer to peer list
-                //add_peer(downloads[0].ihave_recv[j].peers, SOMETHING);
-        //    }
-        //}
+//         // THIS NEEDS A LOT OF WORK; TODO
+//         // Try to match returned hash to requested one and store peer identity
+//         //int id = hash2id(hash, config);
+//         //for (int j = 0; j < downloads[0].n_chunks; j++) {
+//         //    if (downloads[0].ihave_recv[j].chunk_id == id) {
+//                 // Add peer to peer list
+//                 //add_peer(downloads[0].ihave_recv[j].peers, SOMETHING);
+//         //    }
+//         //}
 
-        offset += inc;
-    }
-}
-
-/*
- * check_retry_get
- * 
- * Check timeout for when last data packet received and last get sent have been 
- * exceeded.  If less than the maximum number of gets have been sent, then 
- * resend another get.  Otherwise, 
- */
-void check_retry_get(chunkd_t chunkd, clock_t now) {
-    /* 
-     * Check if timeouts for when last get was sent and last data packet was 
-     * received have been exceeded.
-     */
-    if ((now - chunkd.last_get_sent > GET_WINDOW) &&
-        (now - chunkd.last_data_recv > DATA_WINDOW)) {
-        if (chunkd.n_tries_get < MAX_RETRIES_GET) {
-            // TODO
-            //send_get(...);
-        }
-        else {
-            /* Try to finish by downloading the chunk from a different peer. */
-            // TODO
-        }
-    }
-    // Check when the last data packet was received
-    // Either attempt to verify chunk, stop download entirely (if max retries exceeded), or send another GET
-}
-
-void check_chunk_downloads(download_t *download) {
-    clock_t now = clock();
-
-    for (int i = 0; i < download->n_chunks; i++) {
-        if (download->chunks[i].state == WAIT_DATA) {
-            check_retry_get(download->chunks[i], now);
-        }
-    }
-}
-
-/*
- * create_ack_packet
- * 
- * Wrapper for init_packet function to simplify ACK packet creation.
- */
-void create_ack_packet(data_packet_t *pack, int ack_num) {
-    init_packet(pack, ACK_TYPE, INVALID_FIELD, ack_num, NULL, 0);
-}
-
-/*
- * send_ack
- * 
- * Creates and sends an ACK packet with a specific ACK number.
- */
-void send_ack(struct sockaddr_in *dest, int ack_num, bt_config_t *config) {
-    data_packet_t pack;
-    create_ack_packet(&pack, ack_num);
-    send_pack(&pack, dest, config);
-}
-
-/*
- * verify_chunk
- */
-void verify_chunk() {
-    // Generate hash for chunk data
-    // Compare generated hash to current hash
-}
-
-/*
- * is_chunk_done
- * 
- * Returns a boolean for whether the given chunk has been downloaded entirely.
-//  */
-// char is_chunk_done() {
-
+//         offset += inc;
+//     }
 // }
 
-/*
- * process_data
- */
-void process_data() {
-    // Store data in chunk download struct
-}
+// /*
+//  * check_retry_get
+//  * 
+//  * Check timeout for when last data packet received and last get sent have been 
+//  * exceeded.  If less than the maximum number of gets have been sent, then 
+//  * resend another get.  Otherwise, 
+//  */
+// void check_retry_get(chunkd_t chunkd, clock_t now) {
+//     /* 
+//      * Check if timeouts for when last get was sent and last data packet was 
+//      * received have been exceeded.
+//      */
+//     if ((now - chunkd.last_get_sent > GET_WINDOW) &&
+//         (now - chunkd.last_data_recv > DATA_WINDOW)) {
+//         if (chunkd.n_tries_get < MAX_RETRIES_GET) {
+//             // TODO
+//             //send_get(...);
+//         }
+//         else {
+//             /* Try to finish by downloading the chunk from a different peer. */
+//             // TODO
+//         }
+//     }
+//     // Check when the last data packet was received
+//     // Either attempt to verify chunk, stop download entirely (if max retries exceeded), or send another GET
+// }
+
+// void check_chunk_downloads(download_t *download) {
+//     clock_t now = clock();
+
+//     for (int i = 0; i < download->n_chunks; i++) {
+//         if (download->chunks[i].state == WAIT_DATA) {
+//             check_retry_get(download->chunks[i], now);
+//         }
+//     }
+// }
+
+// /*
+//  * create_ack_packet
+//  * 
+//  * Wrapper for init_packet function to simplify ACK packet creation.
+//  */
+// void create_ack_packet(data_packet_t *pack, int ack_num) {
+//     init_packet(pack, ACK_TYPE, INVALID_FIELD, ack_num, NULL, 0);
+// }
+
+// /*
+//  * send_ack
+//  * 
+//  * Creates and sends an ACK packet with a specific ACK number.
+//  */
+// void send_ack(struct sockaddr_in *dest, int ack_num, bt_config_t *config) {
+//     data_packet_t pack;
+//     create_ack_packet(&pack, ack_num);
+//     send_pack(&pack, dest, config);
+// }
+
+// /*
+//  * verify_chunk
+//  */
+// void verify_chunk() {
+//     // Generate hash for chunk data
+//     // Compare generated hash to current hash
+// }
+
+// /*
+//  * is_chunk_done
+//  * 
+//  * Returns a boolean for whether the given chunk has been downloaded entirely.
+// //  */
+// // char is_chunk_done() {
+
+// // }
+
+// /*
+//  * process_data
+//  */
+// void process_data() {
+//     // Store data in chunk download struct
+// }

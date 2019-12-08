@@ -11,20 +11,13 @@
 
 #define BT_CHUNK_SIZE (512 * 1024)
 #define CHK_HASH_BYTES 20
-#define CHK_HASHLEN (CHK_HASH_BYTES * 2)
-
+#define CHK_HASH_ASCII (2 * CHK_HASH_BYTES)
 #define ascii2hex(ascii,len,buf) hex2binary((ascii),(len),(buf))
 #define hex2ascii(buf,len,ascii) binary2hex((buf),(len),(ascii))
 
-typedef struct chunk_hash {
-  char hash[CHK_HASHLEN];
-  int id;
-  struct chunk_hash *next;
-} chunk_hash_t;
-
-int hash2id(char *, chunk_hash_t *chunklist);
-int parse_chunkfile(char *chunkfile, chunk_hash_t **chunklist);
-int parse_hashes_ids(char *chunkfile, char hashes[][CHK_HASHLEN], int ids[]);
+int hash2id(char *, char *, int *, int);
+int masterchunkf_parse(char *, char *, int *, char *);
+int chunkf_parse(char *, char *, int *);
 
 #ifdef __cplusplus
 extern "C" {

@@ -10,134 +10,84 @@
 #include <assert.h>
 #include <stdlib.h> // for malloc
 #include <string.h> // for memset
+#include <stdio.h>
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
-=======
-void hash_nodes_to_list(chunk_hash_t *chunklist, int num_chunks, 
-  char *hashes, int ids[]) {
+int helper_parse_chunkf(FILE *fp, char *hashes, int *ids) {
+  
+  int n = 0, size = 1;
+  hashes = malloc(size * CHK_HASH_BYTES);
+  ids = malloc(size * sizeof(*ids));
 
-  // Convert linked list intro string array
-  chunk_hash_t *curr = chunklist;
-  for (int i = 0; i < num_chunks; i++) {
-    strncpy(hashes + CHK_HASHLEN * i, curr->hash, CHK_HASHLEN);
-    chunk_hash_t *prev = curr;
-    curr = curr->next;
-    free(prev);
-  }
+  // Read lines from the chunk list file
+  size_t buf_size = 0;
+  char *buf;
+  while (getline(&buf, &buf_size, fp) > 0) {
+	if (size < n) { // Increase size of arrays if they become filled
+		size *= 2;
+		hashes = realloc(hashes, size * sizeof(*hashes));
+  		ids = realloc(ids, size * sizeof(*ids));
+	}
+    if (strlen(buf) < CHK_HASH_ASCII + strlen("0 ")) {
+      fprintf(stderr, "Line \"%s\" in chunk file was too short and could not be parsed.\n", 
+        buf);
+    }
+	else { // Store the chunk's hash and id
+		char id[buf_size], hash[buf_size];
+		sscanf(buf, "%s %s", id, hash);
+		strcpy(&hashes[n * CHK_HASH_BYTES], hash);
+		ids[n++] = atoi(id);
+	}
+  }	
+  free(buf);
+  return n;
 }
 
-/* Creates a singly linked list, storing hash and ID */
-int parse_chunkfile(char *chunkfile, chunk_hash_t **chunklist) {
-  int n_chunks = 0;
-
-  // Open chunkfile
-  FILE *f;
-  f = fopen(chunkfile, "r");
-  if (f == NULL) {
-    fprintf(stderr, "Could not read chunkfile \"%s\".\n", chunkfile);
+FILE *file_read_or_die(char *fname) {
+  FILE *fp = fopen(fname, "r");
+  if (fp == NULL) {
+    fprintf(stderr, "Could not read file \"%s\".\n", fname);
     exit(1);
   }
-
-  // Store data for individual chunk
-  int id;
-  char hash[CHK_HASHLEN];
-  chunk_hash_t *curr = NULL;
-
-  int buf_size = sizeof(int) + sizeof(' ') + CHK_HASHLEN;
-  char *buf = malloc(buf_size + 1);
-  // Read a line from the chunklist file
-  while (getline(&buf, (size_t *) &buf_size, f) > 0) {
-    if (strlen(buf) < CHK_HASHLEN + strlen("0 ")) {
-      fprintf(stderr, "Line \"%s\" in chunkfile \"%s\" was too short and could not be parsed.\n", 
-        buf, chunkfile);
-	  exit(-1);
-    }
-    // Attempt to parse ID and hash from current line in file
-    else {
-      buf[strcspn(buf, "\n")] = '\0'; 
-      int offset = strcspn(buf, " ");
-
-      // Parse ID
-      char num[offset];
-      strncpy(num, buf + offset - 1, sizeof(num));
-      num[offset++] = '\0';
-      id = atoi(num);
-
-      // Parse the hash
-      offset += strspn(buf + offset, " ");
-
-      if (offset >= buf_size) {
-        fprintf(stderr, "Could not parse both id and hash from line \"%s\" in chunkfile \"%s\".\n", 
-          buf, chunkfile);
-      }
-      else {
-        // Read the hash from the buffer
-        strcpy(hash, buf + offset);
-      }
-
-      if (strlen(hash) != CHK_HASHLEN) {
-        fprintf(stderr, "Expected hash \"%s\" to be of length %d.\n", hash, CHK_HASHLEN);
-      }
-      // Found correct number of arguments and of correct lengths, so allocate
-      // a new node 
-      else {
-        chunk_hash_t *new_node;
-        new_node = malloc(sizeof(chunk_hash_t));
-        assert(new_node != NULL);
-        memset(new_node, 0, sizeof(*new_node)); // Zero out the memory
-        strncpy(new_node->hash, hash, CHK_HASHLEN);
-        new_node->id = id;
-
-        if (curr == NULL) {
-          curr = new_node;
-          *chunklist = curr;
-        }
-        else {
-          curr->next = new_node;
-          curr = curr->next;
-        }
-        n_chunks++;
-      }
-    }
-  }
-  free(buf); // Since buf may have been reallocated by `getline`, free it
-  return n_chunks;
+  return fp;
 }
 
-int parse_hashes_ids(char *chunkfile, char *hashes, int ids[]) {
-  // Parse the chunkfile	
-  chunk_hash_t *chunklist = NULL;
-  int num_chunks = parse_chunkfile(chunkfile, &chunklist);
+int masterchunkf_parse(char *fname, char *hashes, int *ids, char *dataf) {
+	FILE *fp = file_read_or_die(fname);
+	size_t buf_size1 = 0, buf_size2 = 0;
+  	char *buf1, *buf2; // Buf2 is a throwaway variable
 
-  // Create array of strings
-  hashes = malloc(num_chunks * (CHK_HASHLEN));
-  ids = malloc(num_chunks * sizeof(int));
-  memset(hashes, 0, sizeof(*hashes));
-  memset(ids, 0, sizeof(*ids));
+	// Read the first two lines of the master chunk file
+	if ((getline(&buf1, &buf_size1, fp) < 0) ||
+		(getline(&buf2, &buf_size2, fp) < 0)) {
+		fprintf(stderr, "Could not read first 2 lines of master chunk file.\n");
+		exit(1);
+	}
 
-  hash_nodes_to_list(chunklist, num_chunks, hashes, ids);
-  return num_chunks;
+	// Parse the name of the data file
+	dataf = malloc(buf_size1);
+	sscanf(buf1, "%s %s", buf2, dataf);
+
+	free(buf1);
+	free(buf2);
+	return helper_parse_chunkf(fp, hashes, ids); // Return # of chunks
 }
 
->>>>>>> 6ee487ea7c13d87368f3ed3335c69a6e1972c4f3
+int chunkf_parse(char *fname, char *hashes, int *ids) {
+	FILE *fp = file_read_or_die(fname);
+	return helper_parse_chunkf(fp, hashes, ids); // Return # of chunks
+}
+
 /*
- * Return the ID for a specific hash given as bytes.  If the ID is not
- * found, the function will return -1.
- */
-int hash2id(char *hash, chunk_hash_t *chunklist) {
-    int n_chunks = 0; // stupid stupid stupid
-    
-    chunk_hash_t *curr_ch = chunklist;
-    for (int j = 0; j < n_chunks; j++) {
-        if (strncmp(hash, curr_ch->hash, CHK_HASHLEN))
-            return curr_ch->id;
-        curr_ch = curr_ch->next; // Move on to next chunk hash if not found
-    }
-	return -1;
+* Return the ID for a specific hash given as bytes.  If the ID is not
+* found, the function will return -1.
+*/
+int hash2id(char *hash, char *hashes, int *ids, int n_hashes) {
+   for (int i = 0; i < n_hashes; i++) {
+       if (strncmp(hash, &hashes[i * CHK_HASH_BYTES], CHK_HASH_BYTES))
+           return ids[i];
+   }
+return -1;
 }
->>>>>>> df9a181f4f5640dc6c126adb24ea3a4bbd3471a0
 
 /**
  * fp -- the file pointer you want to chunkify.
