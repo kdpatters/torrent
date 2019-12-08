@@ -14,7 +14,6 @@
 
 #define BT_FILENAME_LEN 255
 #define BT_MAX_PEERS 1024
-#define MAX_FILENAME 20
 
 typedef struct bt_peer_s {
   short  id;

@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 /* 
  * upload.c
  * 
@@ -8,7 +7,6 @@
 #include <string.h>
 #include <stdlib.h>
 #include <time.h>
-#include "peer.h"
 #include "upload.h"
 #include "download.h"
 #include "bt_parse.h"
@@ -135,7 +133,6 @@ void send_ack(data_packet_t ack, struct sockaddr_in *desti, bt_config_t *cg) {
     data_packet_t created_ack =  create_ack_packet(ack);
     send_pack(created_ack, sizeof(created_ack), desti, cg);
 }
-=======
 // /* 
 //  * download.c
 //  * 
@@ -396,6 +393,3 @@ void send_ack(data_packet_t ack, struct sockaddr_in *desti, bt_config_t *cg) {
 //     data_packet_t created_ack =  create_ack_packet(ack);
 //     send_pack(created_ack, sizeof(created_ack), dest, config);
 // }
->>>>>>> c55b58a794499f5f8cef2e85d675a1c7c0894f36
-
-

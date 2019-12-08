@@ -189,7 +189,17 @@ void process_data(server_state_t *state, data_packet_t pct, struct sockaddr_in f
   pct_ack(&new_packet, pct.header.seq_num);
 
   // Save data inside of downloads struct
-
+  chunkd_t *chunks = state->download.chunks;
+  int n = state->download.n_chunks;
+  for (int i = 0; i < n; i++) {
+    // Look for the relevant chunk
+    if (strncmp(&chunks[i].peer, (char *) &from, sizeof(from)) == 0) {
+      // Insert node into pieces list
+      // Update pieces counter
+      // Store information about last_data_recv
+      break;
+     }
+  }
   // Check if download is complete, if so verify chunk then write to disc
   // Start the download of the next chunk
 }
