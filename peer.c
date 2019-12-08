@@ -113,6 +113,9 @@ void cmd_get(char *chunkf, char *outputf, server_state_t *state) {
   // Flood the network
   flood_peers(packet_list, n_packets, state);
 
+  // Start the download timer and initialize chunks
+  // TODO
+
   free(hashes);
   free(ids);
   free(packet_list);
@@ -184,8 +187,13 @@ void process_get(server_state_t *state, data_packet_t pct, struct sockaddr_in fr
 
 void process_data(server_state_t *state, data_packet_t pct, struct sockaddr_in from) {
   // Send ACK response
+  data_packet_t new_packet;
+  pct_ack(&new_packet, pct.header.seq_num);
+
   // Save data inside of downloads struct
+
   // Check if download is complete, if so verify chunk then write to disc
+  // Start the download of the next chunk
 }
 
 void process_ack(server_state_t *state, data_packet_t pct, struct sockaddr_in from) {
