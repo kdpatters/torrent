@@ -132,6 +132,14 @@ void shahash(uint8_t *str, int len, uint8_t *hash) {
 	memset(&sha, 0, sizeof(sha));
 }
 
+/* Returns True only when the hash generated from `str` matches the
+ * hash given by `hash` */
+int verify_hash(uint8_t *str, int len, uint8_t *hash) {
+  uint8_t gen_hash[SHA1_HASH_SIZE];
+  shahash(str, len, gen_hash);
+  return !strncmp((char *) hash, (char *) &gen_hash, SHA1_HASH_SIZE);
+}
+
 /**
  * converts the binary char string str to ascii format. the length of 
  * ascii should be 2 times that of str
