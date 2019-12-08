@@ -4,7 +4,7 @@
  * Header file for things about packets.
  */
 
-#include "bt_parse.h"
+#include <netinet/in.h>
 
 // Header constants
 #define MAGICNUM 3752
@@ -20,7 +20,8 @@
 
 #define PACKETLEN 1500
 #define PADDING 3
-#define CHK_COUNT 1
+#define CHK_COUNT sizeof(char)
+#define PAYLOAD_TOPPER (char) (CHK_COUNT + PADDING)
 #define HEADER_SIZE sizeof(header_t)
 #define DATALEN (PACKETLEN - HEADER_SIZE)
 #define SPACELEFT (DATALEN - PADDING - CHK_COUNT)
@@ -41,5 +42,11 @@ typedef struct data_packet {
   char data[DATALEN];
 } data_packet_t;
 
-void init_packet(data_packet_t *, char, int, int, char *, int);
-void send_pack(data_packet_t *, struct sockaddr_in *, bt_config_t *);
+void pct_init(data_packet_t *, char, int, int, char *, int);
+void pct_whohas(data_packet_t *packet, char n_hashes, char *hashes);
+void pct_ihave(data_packet_t *packet, char n_hashes, char *hashes);
+void pct_get(data_packet_t *packet, char *hash);
+void pct_data(data_packet_t *packet, int seq_num, char *data, char len);
+void pct_ack(data_packet_t *packet, int ack_num);
+void pct_denied(data_packet_t *packet);
+void pct_send(data_packet_t *, struct sockaddr_in *, int);

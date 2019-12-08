@@ -3,9 +3,8 @@
  *
  */
 
+#include <netinet/in.h>
 #include <time.h>
-#include "packet.h"
-#include "chunk.h"
 
 #define MAX_DOWNLOADS 1
 
@@ -34,14 +33,20 @@ typedef struct data_node_s {
     struct data_node_s *next; 
 } data_node_t;
 
+// Download of a single chunk
 typedef struct chunkd_s {
   // Chunk info
   int chunk_id;
   char hash[CHK_HASH_BYTES];
 
+  // Peer list to store IHAVE responses
+  struct sockaddr_in *peer_list;
+  int pl_filled;
+  int pl_size;
+    
   // Chunk download status
   int state;
-  int peer_id;
+  struct sockaddr_in peer;
   int n_tries_get;
   clock_t last_get_sent;
   clock_t last_data_recv;
@@ -51,6 +56,7 @@ typedef struct chunkd_s {
   data_node_t pieces;
 } chunkd_t;
 
+// Download of multiple requested chunks
 typedef struct download_s {
   clock_t time_started;
 
@@ -61,5 +67,5 @@ typedef struct download_s {
   char *output_file[MAX_FILENAME];
 } download_t;
 
-void process_ihave(data_packet_t *packet, bt_config_t *config, 
-  struct sockaddr_in *from);
+char dload_peer_add(download_t *download, struct sockaddr_in peer, int chunk_id);
+void dload_start(download_t *, char *, int *, int);
