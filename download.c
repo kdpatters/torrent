@@ -8,8 +8,36 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
+#include "bt_parse.h"
+#include "chunk.h"
+#include "download.h"
 
 #define INVALID_FIELD 0
+
+/* Add a peer to the download information for a specific chunk. Returns 
+ * True if the peer was added successfully. */                             
+char dload_peer_add(download_t *download, struct sockaddr_in peer, int chunk_id) {
+    // Iterate through requested chunks                                    
+    for (int i = 0; i < download->n_chunks; i++) {                         
+      chunkd_t *chk = &download->chunks[i];                                
+                                                                           
+      // Check if we found the IHAVE chunk in the requested chunks         
+      if (chk->chunk_id == chunk_id) {                                     
+                                                                           
+        // Resize the peer list if necessary                               
+        if (chk->pl_size <= chk->pl_filled) {                              
+          chk->pl_size = 0 ? chk->pl_size * 2 : 1;                         
+          chk->peer_list = realloc(chk->peer_list,                         
+             sizeof(*chk->peer_list) * chk->pl_size);                      
+        }                                                                  
+                                                                           
+        // Finally add the peer                                            
+        memcpy(&chk->peer_list[chk->pl_filled++], &peer, sizeof(peer)); 
+        return 1;                                                          
+      }                                                                    
+    }                                                                      
+    return 0;                                                              
+}    
 
 /* 
  * can_download

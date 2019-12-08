@@ -118,10 +118,13 @@ void cmd_get(char *chunkf, char *outputf, server_state_t *state) {
   free(packet_list);
 }
 
-
-void process_whohas(server_state_t *state, data_packet_t pct, struct sockaddr_in from) {
-  char matched[DATALEN];
-  char m = 0; // Number of hash matches
+/* 
+ * get_n_hashes
+ *
+ * Parses the integer giving the number of hashes in the payload for
+ * WHOHAS and IHAVE packets.
+ */
+int get_n_hashes(data_packet_t pct) {
   char n = pct.data[0]; // Get the number of hashes in the packet
 
   if (n > MAX_CHK_HASHES) {
@@ -130,18 +133,23 @@ maximum number of hashes.\n");
     exit(1);
   }
 
+  return n;
+}
+
+void process_whohas(server_state_t *state, data_packet_t pct, struct sockaddr_in from) {
+  char matched[DATALEN];
+  char m = 0; // Number of hash matches
+  char n = get_n_hashes(pct);
+
+  // Parse the hashes from the packet
   for (int i = 0; i < n; i++) {
-    char *curr_hash = pct.data + PAYLOAD_TOPPER + i * CHK_HASH_BYTES;
-    char hash[CHK_HASH_BYTES];
-    
-    ascii2hex(curr_hash, CHK_HASH_ASCII, (unsigned char *) hash);
-    
+    char *hash = pct.data + PAYLOAD_TOPPER + i * CHK_HASH_BYTES;
+
     int id = hash2id(hash, state->mcf_hashes, state->mcf_ids, state->mcf_len);
 
     // Check if the chunk is in the "has chunk file"
     if (id_in_ids(id, state->hcf_ids, state->hcf_len)) {
-      strncpy(&matched[m * CHK_HASH_BYTES], hash, CHK_HASH_BYTES);
-      m++;
+      strncpy(&matched[m++ * CHK_HASH_BYTES], hash, CHK_HASH_BYTES);
     }
   } 
 
@@ -155,7 +163,14 @@ maximum number of hashes.\n");
 }
 
 void process_ihave(server_state_t *state, data_packet_t pct, struct sockaddr_in from) {
-  // Choose chunk to download and begin download
+  char n = get_n_hashes(pct);
+
+  // Parse the hashes from the packet
+  for (int i = 0; i < n; i++) {
+    char *hash = pct.data + PAYLOAD_TOPPER + i * CHK_HASH_BYTES;
+    int id = hash2id(hash, state->mcf_hashes, state->mcf_ids, state->mcf_len);
+    dload_peer_add(&state->download, from, id);
+  }
 }
 
 void process_get(server_state_t *state, data_packet_t pct, struct sockaddr_in from) {
