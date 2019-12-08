@@ -6,8 +6,8 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <time.h>
-#include "download.h"
 #include "peer.h"
 
 #define INVALID_FIELD 0
@@ -76,21 +76,21 @@ void send_get(struct sockaddr_in *dest, char hash[CHK_HASH_BYTES],
  * Initialize the struct to keep track of the chunks and connected peers for the
  * specific download.
  */
-void init_download(char hash[][CHK_HASH_BYTES], int n_chunks, 
-    download_t *download, bt_config_t *config) {
+// void init_download(char hash[][CHK_HASH_BYTES], int n_chunks, 
+//     download_t *download, bt_config_t *config) {
     
-    // Get a pointer to the first empty download
-    download->ihave_recv = malloc(sizeof(ihave_list_t) * n_chunks);
-    download->n_chunks = n_chunks;
-    for (int i = 0; i < n_chunks; i++) {
-        // Get and store hash ID
-        download->ihave_recv[i].chunk_id = hash2id(hash[i], config);
-    }
+//     // Get a pointer to the first empty download
+//     download->ihave_recv = malloc(sizeof(ihave_list_t) * n_chunks);
+//     download->n_chunks = n_chunks;
+//     for (int i = 0; i < n_chunks; i++) {
+//         // Get and store hash ID
+//         download->ihave_recv[i].chunk_id = hash2id(hash[i], config);
+//     }
 
-    // Officially start the download
-    download->state = DLOAD_WAIT_IHAVE;
-    download->time_started = clock();
-}
+//     // Officially start the download
+//     download->state = DLOAD_WAIT_IHAVE;
+//     download->time_started = clock();
+// }
 
 void process_ihave(data_packet_t *packet, bt_config_t *config, 
     struct sockaddr_in *from) {
@@ -107,6 +107,11 @@ void process_ihave(data_packet_t *packet, bt_config_t *config,
     int offset = CHK_COUNT + PADDING;
     char hash[inc]; // Temporary variable to store hash
     for (int i = 0; i < n_chunks; i++) {
+        if (offset > max_offset) {
+            fprintf(stderr, "Parsed %d chunk hashes from IHAVE but expected %d.",
+            i + 1, n_chunks);
+            exit(-1);
+        }
         // Read and store the next hash
         memcpy(hash, packet->data + offset, inc);
 
@@ -121,10 +126,6 @@ void process_ihave(data_packet_t *packet, bt_config_t *config,
         //}
 
         offset += inc;
-        if (offset > max_offset) {
-            fprintf(stderr, "Parsed %d chunk hashes from IHAVE but expected %d.",
-            i + 1, n_chunks);
-        }
     }
 }
 
@@ -135,16 +136,14 @@ void process_ihave(data_packet_t *packet, bt_config_t *config,
  * exceeded.  If less than the maximum number of gets have been sent, then 
  * resend another get.  Otherwise, 
  */
-void check_retry_get(chunk_download_t chunk_dload) { // Need to pass in downloads as an argument
-    clock_t now = clock();
-    
+void check_retry_get(chunkd_t chunkd, clock_t now) {
     /* 
      * Check if timeouts for when last get was sent and last data packet was 
      * received have been exceeded.
      */
-    if ((now - chunk_dload.last_get_sent > GET_WINDOW) &&
-        (now - chunk_dload.last_data_recv > DATA_WINDOW)) {
-        if (chunk_dload.n_tries_get < MAX_RETRIES_GET) {
+    if ((now - chunkd.last_get_sent > GET_WINDOW) &&
+        (now - chunkd.last_data_recv > DATA_WINDOW)) {
+        if (chunkd.n_tries_get < MAX_RETRIES_GET) {
             // TODO
             //send_get(...);
         }
@@ -157,6 +156,15 @@ void check_retry_get(chunk_download_t chunk_dload) { // Need to pass in download
     // Either attempt to verify chunk, stop download entirely (if max retries exceeded), or send another GET
 }
 
+void check_chunk_downloads(download_t *download) {
+    clock_t now = clock();
+
+    for (int i = 0; i < download->n_chunks; i++) {
+        if (download->chunks[i].state == WAIT_DATA) {
+            check_retry_get(download->chunks[i], now);
+        }
+    }
+}
 
 /*
  * create_ack_packet

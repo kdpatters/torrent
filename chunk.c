@@ -16,12 +16,12 @@
 =======
 =======
 void hash_nodes_to_list(chunk_hash_t *chunklist, int num_chunks, 
-  char hashes[][CHK_HASHLEN], int ids[]) {
+  char *hashes, int ids[]) {
 
   // Convert linked list intro string array
   chunk_hash_t *curr = chunklist;
   for (int i = 0; i < num_chunks; i++) {
-    strncpy(hashes[i], curr->hash, CHK_HASHLEN);
+    strncpy(hashes + CHK_HASHLEN * i, curr->hash, CHK_HASHLEN);
     chunk_hash_t *prev = curr;
     curr = curr->next;
     free(prev);
@@ -106,10 +106,10 @@ int parse_chunkfile(char *chunkfile, chunk_hash_t **chunklist) {
   return n_chunks;
 }
 
-int parse_hashes_ids(char *chunkfile, char hashes[][CHK_HASHLEN], int ids[]) {
-  chunk_hash_t *chunklist = NULL; // Parse the chunkfile	
+int parse_hashes_ids(char *chunkfile, char *hashes, int ids[]) {
+  // Parse the chunkfile	
+  chunk_hash_t *chunklist = NULL;
   int num_chunks = parse_chunkfile(chunkfile, &chunklist);
-  hash_nodes_to_list(chunklist, num_chunks, hashes, ids);
 
   // Create array of strings
   hashes = malloc(num_chunks * (CHK_HASHLEN));
@@ -117,6 +117,7 @@ int parse_hashes_ids(char *chunkfile, char hashes[][CHK_HASHLEN], int ids[]) {
   memset(hashes, 0, sizeof(*hashes));
   memset(ids, 0, sizeof(*ids));
 
+  hash_nodes_to_list(chunklist, num_chunks, hashes, ids);
   return num_chunks;
 }
 
@@ -125,8 +126,7 @@ int parse_hashes_ids(char *chunkfile, char hashes[][CHK_HASHLEN], int ids[]) {
  * Return the ID for a specific hash given as bytes.  If the ID is not
  * found, the function will return -1.
  */
-int hash2id(char *hash, bt_config_t *config) {
-    chunk_hash_t *chunklist = NULL;
+int hash2id(char *hash, chunk_hash_t *chunklist) {
     int n_chunks = 0; // stupid stupid stupid
     
     chunk_hash_t *curr_ch = chunklist;
