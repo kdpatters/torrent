@@ -15,6 +15,22 @@
 
 #define INVALID_FIELD 0
 
+void dload_check_status(download_t *download) {
+    clock_t now = clock();
+    clock_t time_passed = now - download->time_started;
+    //int n = download->n_chunks;
+    // Number of chunks waiting to download
+    int w = download->n_chunks - download->n_in_progress;
+    //chunkd_t *chunks = download->chunks;
+    /* Check if download is waiting for IHAVE responses and the timeout
+     * has been surpassed. */
+    if (download->waiting_ihave && (time_passed > TIME_WAIT_IHAVE)) {
+        for (int i = 0; i < w; i++) {
+        }
+        
+    }
+}
+
 /* Add a peer to the download information for a specific chunk. Returns 
  * True if the peer was added successfully. */                             
 char dload_peer_add(download_t *download, struct sockaddr_in peer, int chunk_id) {

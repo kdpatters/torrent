@@ -20,6 +20,7 @@
 #define GET_WINDOW (MS_TO_S * 5)
 #define DATA_WINDOW (MS_TO_S * 5)
 #define MAX_RETRIES_GET 3
+#define TIME_WAIT_IHAVE MS_TO_S * 5
 
 // Filename lengths
 #define MAX_FILENAME 100
@@ -59,9 +60,11 @@ typedef struct chunkd_s {
 // Download of multiple requested chunks
 typedef struct download_s {
   clock_t time_started;
+  int waiting_ihave;
 
   // Chunk info
   int n_chunks;
+  int n_in_progress;
   chunkd_t *chunks;
 
   char *output_file[MAX_FILENAME];

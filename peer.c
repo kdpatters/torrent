@@ -22,6 +22,7 @@
 #include "upload.h"
 #include "download.h"
 #include "server_state.h"
+#include "test_peer.h"
 
 void peer_run(bt_config_t *config);
 
@@ -34,8 +35,10 @@ int main(int argc, char **argv) {
 
 #ifdef TESTING
   config.identity = 3; // your group number here
-  strcpy(config.chunk_file, "chunkfile");
-  strcpy(config.has_chunk_file, "haschunks");
+  strcpy(config.chunk_file, "example/C.masterchunks");
+  strcpy(config.has_chunk_file, "example/A.chunks");
+  test_peer();
+  return 0;
 #endif
 
   bt_parse_command_line(&config);
@@ -62,6 +65,19 @@ int id_in_ids(int id, int *ids, int ids_len) {
       return 1;
   }
   return 0;  
+}
+
+/* Returns the id for a peer based on its IP address and port. */
+int peer_addr_to_id(struct sockaddr_in peer, server_state_t *state) {
+  for (bt_peer_t *p = state->config->peers; p != NULL; p = p->next) {
+    if ((p->addr.sin_port = peer.sin_port) && 
+        (p->addr.sin_addr.s_addr = peer.sin_addr.s_addr)) {
+          return p->id;
+    }
+  }
+fprintf(stderr, "Could not find peer ID for IP and port\n");
+exit(1);
+return -1; // Alternative behavior could be to simply ignore the packet
 }
 
 void flood_peers(data_packet_t *packet_list, int n_packets,
