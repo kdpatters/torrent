@@ -66,10 +66,13 @@ int id_in_ids(int id, int *ids, int ids_len) {
 
 void flood_peers(data_packet_t *packet_list, int n_packets,
   server_state_t *state) {
+  DPRINTF(DEBUG_SOCKETS, "flood_peers: Preparing to flood network with packets\n");
 
   // Iterate through known peers
   for (bt_peer_t *p = state->config->peers; p != NULL; p = p->next) {
     if (p->id != state->config->identity) {
+        DPRINTF(DEBUG_SOCKETS, "flood_peers: Sending list of %d packet(s) to peer %d\n",
+          n_packets, p->id);
         // Iterate through packets, sending each to given peer
         for (int i = 0; i < n_packets; i++)
           pct_send(&packet_list[i], &p->addr, state->sock); 
@@ -79,34 +82,40 @@ void flood_peers(data_packet_t *packet_list, int n_packets,
 
 /* Creates a list of packets from given hashes, which it stores in
  * `packet_list`.  Returns the number of created packets. */
-int hashes2packets(data_packet_t *packet_list, char *hashes, 
+int hashes2packets(data_packet_t **packet_list, char *hashes, 
     int n_hashes, void (*packet_func)(data_packet_t *, char, char *)) {
+  DPRINTF(DEBUG_PACKETS, "hashes2packets: Dividing hash list into packets\n");
     
   // Create an array of packets to store the chunk hashes
   int list_size = (n_hashes / MAX_CHK_HASHES) + 
     ((n_hashes % MAX_CHK_HASHES) != 0);
-  packet_list = malloc(sizeof(*packet_list) * list_size);
+  *packet_list = malloc(sizeof(data_packet_t) * list_size);
+  DPRINTF(DEBUG_PACKETS, "hashes2packets: Allocated %d packets for %d hashes\n",
+    list_size, n_hashes);
 
   // Package the chunks into packets
+  DPRINTF(DEBUG_PACKETS, "hashes2packets: Calling helper function to initialize packets\n");
   for (int i = 0; i < list_size; i++) {
-    packet_func(&packet_list[i], 
+    packet_func(packet_list[i], 
       MIN(MAX_CHK_HASHES, n_hashes), 
       &hashes[i * MAX_CHK_HASHES]);
     n_hashes -= MIN(MAX_CHK_HASHES, n_hashes);
   }
+  DPRINTF(DEBUG_PACKETS, "hashes2packets: Finished creating packets\n");
   return list_size;
 }
 
 void cmd_get(char *chunkf, char *outputf, server_state_t *state) {
-  
+  DPRINTF(DEBUG_COMMANDS, "cmd_get: Executing get command\n");
+
   // Parse the chunk file
   int *ids = NULL;
   char *hashes = NULL;
-  int n_hashes = chunkf_parse(chunkf, hashes, ids);
+  int n_hashes = chunkf_parse(chunkf, &hashes, &ids);
 
   // Create the packets
   data_packet_t *packet_list = NULL;
-  int n_packets = hashes2packets(packet_list, hashes, n_hashes, &pct_whohas);
+  int n_packets = hashes2packets(&packet_list, hashes, n_hashes, &pct_whohas);
 
   // Flood the network
   flood_peers(packet_list, n_packets, state);
@@ -157,7 +166,7 @@ void process_whohas(server_state_t *state, data_packet_t pct, struct sockaddr_in
   // Send the WHOHAS response
   data_packet_t *packet_list = NULL;
   // The WHOHAS response should technically fit in only 1 packet...
-  int n_packets = hashes2packets(packet_list, matched, m, &pct_ihave);
+  int n_packets = hashes2packets(&packet_list, matched, m, &pct_ihave);
   for (int i = 0; i < n_packets; i++)
     pct_send(&packet_list[i], &from, state->sock);
   free(packet_list);
@@ -193,7 +202,7 @@ void process_data(server_state_t *state, data_packet_t pct, struct sockaddr_in f
   int n = state->download.n_chunks;
   for (int i = 0; i < n; i++) {
     // Look for the relevant chunk
-    if (strncmp(&chunks[i].peer, (char *) &from, sizeof(from)) == 0) {
+    if (strncmp((char *) &chunks[i].peer, (char *) &from, sizeof(from)) == 0) {
       // Insert node into pieces list
       // Update pieces counter
       // Store information about last_data_recv
@@ -222,36 +231,37 @@ void process_inbound_udp(int sock, server_state_t *state) {
 
   fromlen = sizeof(from);
   spiffy_recvfrom(sock, buf, PACKETLEN, 0, (struct sockaddr *) &from, &fromlen);
+  DPRINTF(DEBUG_SOCKETS, "Received UDP packet\n");
 
   memcpy(&pct, buf, sizeof(pct));
   int pct_type = pct.header.packet_type;
   switch (pct_type) {
     case WHOHAS_TYPE:
-      printf("Received WHOHAS packet.\n");
+      DPRINTF(DEBUG_SOCKETS, "Received WHOHAS packet.\n");
       process_whohas(state, pct, from);
       break;
     case IHAVE_TYPE:
-      printf("Received ihave packet.\n");
+      DPRINTF(DEBUG_SOCKETS, "Received IHAVE packet.\n");
       process_ihave(state, pct, from);
       break;
     case GET_TYPE:
-      printf("Received GET packet.\n");
+      DPRINTF(DEBUG_SOCKETS, "Received GET packet.\n");
       process_get(state, pct, from);
       break;
     case DATA_TYPE:
-      printf("Received DATA packet.\n");
+      DPRINTF(DEBUG_SOCKETS, "Received DATA packet.\n");
       process_data(state, pct, from);
       break;
     case ACK_TYPE:
-      printf("Received ACK packet.\n");
+      DPRINTF(DEBUG_SOCKETS, "Received ACK packet.\n");
       process_ack(state, pct, from);
       break;
     case DENIED_TYPE:
-      printf("Received DENIED packet.\n");
+      DPRINTF(DEBUG_SOCKETS, "Received DENIED packet.\n");
       process_denied(state, pct, from);
       break;
     default:
-      printf("Packet type %d not understood.\n", pct_type);
+      DPRINTF(DEBUG_SOCKETS, "Packet type %d not understood.\n", pct_type);
   }
 } 
 
@@ -276,9 +286,9 @@ void server_state_init(server_state_t *state, bt_config_t *config,
   state->sock = sock;
 
   state->mcf_len = masterchunkf_parse(config->chunk_file, 
-    state->mcf_hashes, state->mcf_ids, state->dataf);
+    &state->mcf_hashes, &state->mcf_ids, &state->dataf);
   state->hcf_len = chunkf_parse(config->has_chunk_file,
-    state->hcf_hashes, state->hcf_ids);
+    &state->hcf_hashes, &state->hcf_ids);
 }
 
 void peer_run(bt_config_t *config) {

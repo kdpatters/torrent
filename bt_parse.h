@@ -1,8 +1,6 @@
 /*
  * bt_parse.h
  *
- * Skeleton for CMPU-375 programming project #2:
- *   command line and config file parsing stubs.
  */
 
 #ifndef _BT_PARSE_H_

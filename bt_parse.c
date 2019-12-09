@@ -1,8 +1,7 @@
 /*
  * bt_parse.c
  *
- * Skeleton for CMPU-375 programming project #2:
- *   command line and config file parsing stubs.
+ * Command line and file parsing.
  */
 
 #include <assert.h>

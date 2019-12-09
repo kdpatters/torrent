@@ -25,11 +25,13 @@ extern unsigned int debug;
 #define DEBUG_ERRS      0x01    // DBTEXT:  Verbose error reporting
 #define DEBUG_INIT      0x02    // DBTEXT:  Debug initialization
 #define DEBUG_SOCKETS   0x04    // DBTEXT:  Debug socket operations
-#define DEBUG_COMMANDS  0x06    // DBTEXT:  Debug commands (e.g. GET)
 #define DEBUG_PROCESSES 0x08    // DBTEXT:  Debug processes (fork/reap/etc)
 #define DEBUG_SPIFFY    0x10    // DBTEXT:  Debug the spiffy sending code
+#define DEBUG_CHUNKS    0x20    // DBTEXT:  Debug chunk parsing functions
+#define DEBUG_COMMANDS  0x40    // DBTEXT:  Debug commands (e.g. GET)
+#define DEBUG_PACKETS   0x80    // DBTEXT:  Debug packet creation
 
-#define DEBUG_ALL  0xffffffff
+#define DEBUG_ALL       0xff    // DBTEXT:  Show all debug messages
 
 #ifdef __cplusplus
 extern "C" {
