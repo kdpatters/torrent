@@ -239,6 +239,7 @@ void process_get(server_state_t *state, data_packet_t pct, struct sockaddr_in fr
     // Check that chunk is in "has chunk file", 
     if ((up_emp != -1) && (id_in_ids(id, state->hcf_ids, state->hcf_len))) {
       upl = &state->uploads[up_emp];
+      upl->peer_id = peer_addr_to_id(from, state);
       upl->chunk.chunk_id = id;
       read_chunk(upl, state->dataf, buf); // Reads chunk from Data file in Master chunkfile
       make_packets(upl, buf, buf_size); // Split chunk into packets
@@ -257,6 +258,7 @@ void process_data(server_state_t *state, data_packet_t pct, struct sockaddr_in f
   // Send ACK response
   data_packet_t new_packet;
   pct_ack(&new_packet, pct.header.seq_num);
+  pct_send(&new_packet, &from, state->sock);
 
   // Save data inside of downloads struct
   chunkd_t *chunks = state->download.chunks;
@@ -274,10 +276,43 @@ void process_data(server_state_t *state, data_packet_t pct, struct sockaddr_in f
   // Start the download of the next chunk
 }
 
+/*
+ * Returns index of the relevant upload if found, otherwise returns -1.
+ */
+int get_relevant_upload(struct sockaddr_in from, server_state_t *state) {
+    int sender_id = peer_addr_to_id(from, state);
+    for (int i = 0; i < MAX_UPLOADS; i++) {
+        int peer_id = state->uploads[i].peer_id;
+        if (sender_id == peer_id) {
+          DPRINTF(DEBUG_UPLOAD, "get_relevant_upload: Found match for peer id %d and upload %d\n", peer_id, i);  
+          return i;
+        }
+    }
+    DPRINTF(DEBUG_UPLOAD, "get_relevant_upload: Did not find any match for peer id %d in uploads\n", sender_id);
+    return -1;
+}
+
 void process_ack(server_state_t *state, data_packet_t pct, struct sockaddr_in from) {
+  int ind = get_relevant_upload(from, state);
+  // Ignore the ACK if we aren't processing an upload for the sender
+  if (ind == -1) {
+     return;
+  }
+  DPRINTF(DEBUG_UPLOAD, "process_ack: Reading info about upload %d\n", ind);
+  upload_t *up = &state->uploads[ind];
+
   // Store ACK in uploads struct
+  // TODO
+
   // Send the next data packet
-  // Update uploads struct sequence number
+  DPRINTF(DEBUG_UPLOAD, "process_ack: Currently, %d of %d packets sent\n",
+    up->seq_num, up->chunk.l_size);
+  if (up->seq_num < up->chunk.l_size - 1) {
+      struct sockaddr_in *peer_addr = peer_id_to_addr(up->peer_id, state); 
+      // Update uploads struct sequence number
+      pct_send(&up->chunk.packetlist[++up->seq_num], peer_addr, state->sock);
+  }
+  DPRINTF(DEBUG_UPLOAD, "process_ack: Upload to peer %d completed\n", ind);
 }
 
 void process_denied(server_state_t *state, data_packet_t pct, struct sockaddr_in from) {
@@ -342,15 +377,16 @@ void dload_check_status(server_state_t *state) {
             int rarest = dload_rarest_chunk(download);                     
             chunkd_t *chunk = &download->chunks[rarest];                   
             //bt_peer_t *peer = bt_peer_info(state->config, chunk->peer_list[0]);
-            data_packet_t pack;                                            
-            char *hash = id2hash(chunk->chunk_id,                          
-                state->mcf_hashes, state->mcf_len);                        
-            pct_get(&pack, hash);                                          
             // TODO: replace peer list with ids instead of addr            
             // TODO: check if download in progress with given peer
-            if (chunk->pl_filled > 0) 
+            if (chunk->pl_filled > 0) { 
+                data_packet_t pack;                                            
+                char *hash = id2hash(chunk->chunk_id,                          
+                    state->mcf_hashes, state->mcf_len);                        
+                pct_get(&pack, hash);                                          
                 pct_send(&pack, peer_id_to_addr(chunk->peer_list[0], 
                     state), state->sock);
+            }
             download->waiting_ihave = 0; // Stop waiting for IHAVE             
        // }                                                               
                                                                         

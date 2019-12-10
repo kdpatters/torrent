@@ -33,6 +33,7 @@ void make_packets(upload_t *upl, char* buf, int buf_size) {
         }
         upl->chunk.packetlist = packs;
         upl->chunk.l_size = listsize;
+    DPRINTF(DEBUG_UPLOAD, "make_packets: Finished creating %d packets\n", listsize);
 }
 
 // Function to read a chunk based on its specific ID from a file;

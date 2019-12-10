@@ -23,13 +23,6 @@ typedef struct chunku_s {
   // Chunk info
     int chunk_id;
     char hash[CHK_HASH_BYTES];
-
-  // Chunk upload status
-    int state;
-    int peer_id;
-    int n_tries_get;
-    clock_t last_get_sent;
-    clock_t last_data_recv;
   
   // Data
     char data[BT_CHUNK_SIZE]; // Space reserved for entire chunk
@@ -39,7 +32,9 @@ typedef struct chunku_s {
 
  typedef struct upload {
     chunku_t chunk;// Chunk to upload 
+    int peer_id;
     int ack_ind; // Ack no. as int to index into recv
+    int seq_num; // Last packet sent in sequence
     clock_t last_ack_rec;
     int *recv; // To keep count of packets sent for upload and recv
     int busy; // Busy -- 1, Not busy - 0  
