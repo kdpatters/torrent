@@ -11,8 +11,25 @@
 #include "bt_parse.h"
 #include "chunk.h"
 #include "download.h"
+#include "debug.h"
 
 #define INVALID_FIELD 0
+
+void dload_check_status(download_t *download) {
+    clock_t now = clock();
+    clock_t time_passed = now - download->time_started;
+    //int n = download->n_chunks;
+    // Number of chunks waiting to download
+    int w = download->n_chunks - download->n_in_progress;
+    //chunkd_t *chunks = download->chunks;
+    /* Check if download is waiting for IHAVE responses and the timeout
+     * has been surpassed. */
+    if (download->waiting_ihave && (time_passed > TIME_WAIT_IHAVE)) {
+        for (int i = 0; i < w; i++) {
+        }
+        
+    }
+}
 
 /* Add a peer to the download information for a specific chunk. Returns 
  * True if the peer was added successfully. */                             
@@ -42,17 +59,20 @@ char dload_peer_add(download_t *download, struct sockaddr_in peer, int chunk_id)
 /* Start the download process as a result of the GET command. */
 void dload_start(download_t *download, char *hashes, int *ids, 
   int n_hashes) {
+  DPRINTF(DEBUG_INIT, "dload_start: Initializing download\n");
   
   // Start the download timer
   download->time_started = clock();
 
   download->chunks = malloc(sizeof(*download->chunks) * n_hashes);
+  DPRINTF(DEBUG_INIT, "dload_start: Copying hashes into chunk array\n");
   for (int i = 0; i < n_hashes; i++) {
     chunkd_t *chk = &download->chunks[i];
     chk->chunk_id = ids[i];
-    strncpy(chk->hash, &hashes[i], CHK_HASH_BYTES);
+    strncpy(chk->hash, &hashes[i * CHK_HASH_BYTES], CHK_HASH_BYTES);
     chk->state = WAIT_IHAVE;
   }
+  DPRINTF(DEBUG_INIT, "dload_start: Done\n");
 }
 
 /* 

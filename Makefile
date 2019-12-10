@@ -3,10 +3,10 @@ CC 		= gcc
 CFLAGS		= -g -Wall -DDEBUG
 LDFLAGS		= -lm
 TESTDEFS	= -DTESTING			# comment this out to disable debugging code
-OBJS		= peer.o bt_parse.o download.o upload.o spiffy.o debug.o input_buffer.o chunk.o sha.o packet.o
-MK_CHUNK_OBJS   = make_chunks.o chunk.o sha.o
+OBJS		= peer.o bt_parse.o download.o upload.o spiffy.o debug.o input_buffer.o chunk.o sha.o packet.o test_peer.o
+MK_CHUNK_OBJS   = make_chunks.o chunk.o sha.o debug.o
 
-BINS            = peer make-chunks
+BINS            = peer make-chunks test-peer
 TESTBINS        = test_debug test_input_buffer
 
 # Implicit .o target
@@ -20,10 +20,13 @@ all: ${BINS} ${TESTBINS}
 run: peer_run
 	./peer_run
 
-test: peer_test
-	./peer_test
+test: test-peer
+	./test-peer
 
 peer: $(OBJS)
+	$(CC) $(CFLAGS) $(OBJS) -o $@ $(LDFLAGS)
+
+test-peer: $(OBJS)
 	$(CC) $(CFLAGS) $(OBJS) -o $@ $(LDFLAGS)
 
 make-chunks: $(MK_CHUNK_OBJS)
@@ -33,10 +36,6 @@ clean:
 	rm -f *.o $(BINS) $(TESTBINS)
 
 bt_parse.c: bt_parse.h
-
-download.c: download.h
-
-packet.c: packet.h
 
 # The debugging utility code
 

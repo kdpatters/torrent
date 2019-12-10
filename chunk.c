@@ -1,31 +1,33 @@
 /*
  * chunk.c
  *
- * Skeleton for CMPU-375 programming project #2: chunk parsing
+ * Chunk parsing and hash operations
  */
 
-#include "sha.h"
-#include "chunk.h"
 #include <ctype.h>
 #include <assert.h>
 #include <stdlib.h> // for malloc
 #include <string.h> // for memset
 #include <stdio.h>
+#include "sha.h"
+#include "chunk.h"
+#include "debug.h"
 
-int helper_parse_chunkf(FILE *fp, char *hashes, int *ids) {
+int helper_parse_chunkf(FILE *fp, char **hashes, int **ids) {
+  DPRINTF(DEBUG_CHUNKS, "helper_parse_chunkf: Started\n");
   
   int n = 0, size = 1;
-  hashes = malloc(size * CHK_HASH_BYTES);
-  ids = malloc(size * sizeof(*ids));
+  *hashes = malloc(size * CHK_HASH_BYTES);
+  *ids = malloc(size * sizeof(*ids));
 
   // Read lines from the chunk list file
   size_t buf_size = 0;
   char *buf;
   while (getline(&buf, &buf_size, fp) > 0) {
-	if (size < n) { // Increase size of arrays if they become filled
+	if (size <= n) { // Increase size of arrays if they become filled
 		size *= 2;
-		hashes = realloc(hashes, size * sizeof(*hashes));
-  		ids = realloc(ids, size * sizeof(*ids));
+		*hashes = realloc(*hashes, size * CHK_HASH_BYTES);
+  		*ids = realloc(*ids, size * sizeof(**ids));
 	}
     if (strlen(buf) < CHK_HASH_ASCII + strlen("0 ")) {
       fprintf(stderr, "Line \"%s\" in chunk file was too short and could not be parsed.\n", 
@@ -34,11 +36,12 @@ int helper_parse_chunkf(FILE *fp, char *hashes, int *ids) {
 	else { // Store the chunk's hash and id
 		char id[buf_size], hash[buf_size];
 		sscanf(buf, "%s %s", id, hash);
-		strcpy(&hashes[n * CHK_HASH_BYTES], hash);
-		ids[n++] = atoi(id);
+		strncpy(&(*hashes)[n * CHK_HASH_BYTES], hash, CHK_HASH_BYTES);
+		(*ids)[n++] = atoi(id);
 	}
   }	
   free(buf);
+  DPRINTF(DEBUG_CHUNKS, "helper_parse_chunkf: Finished parsing chunk file\n");
   return n;
 }
 
@@ -51,7 +54,9 @@ FILE *file_read_or_die(char *fname) {
   return fp;
 }
 
-int masterchunkf_parse(char *fname, char *hashes, int *ids, char *dataf) {
+int masterchunkf_parse(char *fname, char **hashes, int **ids, char **dataf) {
+	DPRINTF(DEBUG_CHUNKS, "masterchunkf_parse: Parsing master chunk file %s\n", fname);
+
 	FILE *fp = file_read_or_die(fname);
 	size_t buf_size1 = 0, buf_size2 = 0;
   	char *buf1, *buf2; // Buf2 is a throwaway variable
@@ -64,15 +69,17 @@ int masterchunkf_parse(char *fname, char *hashes, int *ids, char *dataf) {
 	}
 
 	// Parse the name of the data file
-	dataf = malloc(buf_size1);
-	sscanf(buf1, "%s %s", buf2, dataf);
+	*dataf = malloc(buf_size1);
+	sscanf(buf1, "%s %s", buf2, *dataf);
 
 	free(buf1);
 	free(buf2);
 	return helper_parse_chunkf(fp, hashes, ids); // Return # of chunks
 }
 
-int chunkf_parse(char *fname, char *hashes, int *ids) {
+int chunkf_parse(char *fname, char **hashes, int **ids) {
+	DPRINTF(DEBUG_CHUNKS, "chunkf_parse: Parsing chunk file %s\n", fname);
+
 	FILE *fp = file_read_or_die(fname);
 	return helper_parse_chunkf(fp, hashes, ids); // Return # of chunks
 }

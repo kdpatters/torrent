@@ -8,6 +8,7 @@
 #include "packet.h"
 #include "bt_parse.h"
 #include "chunk.h"
+#include "debug.h"
 
 /*
  * pct_init
@@ -30,8 +31,10 @@ non-positive length.");
 
     // Initialize packet
     memset(pack, 0, sizeof(*pack));
+    DPRINTF(DEBUG_PACKETS, "pct_init: Initialized packet of size %ld\n", sizeof(*pack)); 
 
     // Create the header
+    DPRINTF(DEBUG_PACKETS, "pct_init: Creating packet header\n"); 
     header_t *header = &pack->header;
     header->magicnum = MAGICNUM;
     header->version = VERSIONNUM;
@@ -42,10 +45,14 @@ non-positive length.");
     header->ack_num = ack_num;
 
     // Copy the data into the packet
+    DPRINTF(DEBUG_PACKETS, "pct_init: Copying payload into packet\n"); 
     memcpy(pack->data, payload, payload_len);
+
+    DPRINTF(DEBUG_PACKETS, "pct_init: Created packet of type %d\n", pack->header.packet_type); 
 }
 
-void pct_whohas(data_packet_t *packet, char n_hashes, char *hashes) {   
+void pct_whohas(data_packet_t *packet, char n_hashes, char *hashes) { 
+  DPRINTF(DEBUG_PACKETS, "Creating WHOHAS packet\n");   
   char payload[DATALEN];                                                   
   int hash_bytes = n_hashes * CHK_HASH_BYTES;                              
   int payload_len = PAYLOAD_TOPPER + hash_bytes;                           
@@ -54,27 +61,34 @@ void pct_whohas(data_packet_t *packet, char n_hashes, char *hashes) {
   pct_init(packet, WHOHAS_TYPE, 0, 0, payload, payload_len);               
 }                                                                          
                                                                            
-void pct_ihave(data_packet_t *packet, char n_hashes, char *hashes) {       
+void pct_ihave(data_packet_t *packet, char n_hashes, char *hashes) {
+  DPRINTF(DEBUG_PACKETS, "Creating IHAVE packet\n");       
   pct_init(packet, IHAVE_TYPE, 0, 0, hashes, n_hashes * CHK_HASH_BYTES);
 }                                                                          
                                                                            
-void pct_get(data_packet_t *packet, char *hash) {                          
+void pct_get(data_packet_t *packet, char *hash) {
+  DPRINTF(DEBUG_PACKETS, "Creating GET packet\n");                           
   pct_init(packet, GET_TYPE, 0, 0, hash, CHK_HASH_BYTES);                  
 }                                                                          
                                                                            
 void pct_data(data_packet_t *packet, int seq_num, char *data, char len) {
+  DPRINTF(DEBUG_PACKETS, "Creating DATA packet\n"); 
   pct_init(packet, DATA_TYPE, seq_num, 0, data, len);                      
 }                                                                          
                                                                            
-void pct_ack(data_packet_t *packet, int ack_num) {                         
+void pct_ack(data_packet_t *packet, int ack_num) {
+  DPRINTF(DEBUG_PACKETS, "Creating ACK packet\n");                          
   pct_init(packet, ACK_TYPE, 0, ack_num, "", 0);                           
 }                                                                          
                                                                            
-void pct_denied(data_packet_t *packet) {                                   
+void pct_denied(data_packet_t *packet) {      
+  DPRINTF(DEBUG_PACKETS, "Creating DENIED packet\n");                              
   pct_init(packet, DENIED_TYPE, 0, 0, "", 0);                              
 }   
 
 void pct_send(data_packet_t *pack, struct sockaddr_in *dest, int sockfd) {
+    DPRINTF(DEBUG_SOCKETS, "pct_send: Sending packet of type %d\n", pack->header.packet_type);
     sendto(sockfd, pack, pack->header.packet_len, 0, 
         (const struct sockaddr *) dest, sizeof(*dest));
+    DPRINTF(DEBUG_SOCKETS, "pct_send: Packet sent\n");
 }

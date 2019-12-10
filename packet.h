@@ -23,7 +23,7 @@
 #define CHK_COUNT sizeof(char)
 #define PAYLOAD_TOPPER (char) (CHK_COUNT + PADDING)
 #define HEADER_SIZE sizeof(header_t)
-#define DATALEN (PACKETLEN - HEADER_SIZE)
+#define DATALEN ((int)(PACKETLEN - HEADER_SIZE))
 #define SPACELEFT (DATALEN - PADDING - CHK_COUNT)
 #define MAX_CHK_HASHES (SPACELEFT / CHK_HASH_BYTES)
 

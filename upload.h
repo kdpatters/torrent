@@ -1,9 +1,9 @@
-/* 
- * Upload header file 
- * upload.h
- */
+// /* 
+//  * Upload header file 
+//  * upload.h
+//  */
 
-#include <time.h>
+// #include <time.h>
 
 
 
@@ -15,6 +15,9 @@
 #define MAX_RET_REC_DATA 3
 #define SEQ_NUMB 0
 #define ACK_NUMB 0
+#define NOT_BUSY 0
+#define BUSY 1
+
  
 typedef struct chunku_s {
   // Chunk info
@@ -38,5 +41,9 @@ typedef struct chunku_s {
     chunku_t chunk;// Chunk to upload 
     int ack_ind; // Ack no. as int to index into recv
     clock_t last_ack_rec;
-    int recv[]; // To keep count of packets sent for upload and recv 
+    int *recv; // To keep count of packets sent for upload and recv
+    int busy; // Busy -- 1, Not busy - 0  
 } upload_t;
+
+void make_packets(upload_t *upl, char* buf, int buf_size);
+void read_chunk(upload_t *upl, char *filename, char *buf);
