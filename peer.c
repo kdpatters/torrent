@@ -180,11 +180,14 @@ void process_whohas(server_state_t *state, data_packet_t pct, struct sockaddr_in
       strncpy(&matched[m++ * CHK_HASH_BYTES], hash, CHK_HASH_BYTES);
     }
   } 
+  DPRINTF(DEBUG_CHUNKS, "process_whohas: Matched %d out of %d requested chunks\n", m, n);
 
   // Send the WHOHAS response
   data_packet_t *packet_list = NULL;
   // The WHOHAS response should technically fit in only 1 packet...
   int n_packets = hashes2packets(&packet_list, matched, m, &pct_ihave);
+  DPRINTF(DEBUG_PACKETS, "process_whohas: Creating IHAVE %d packets for %d chunks",
+    n_packets, m);
   for (int i = 0; i < n_packets; i++)
     pct_send(&packet_list[i], &from, state->sock);
   free(packet_list);
@@ -247,7 +250,7 @@ void process_data(server_state_t *state, data_packet_t pct, struct sockaddr_in f
   int n = state->download.n_chunks;
   for (int i = 0; i < n; i++) {
     // Look for the relevant chunk
-    if (strncmp((char *) &chunks[i].peer, (char *) &from, sizeof(from)) == 0) {
+    if (memcmp((char *) &chunks[i].peer, (char *) &from, sizeof(from)) == 0) {
       // Insert node into pieces list
       // Update pieces counter
       // Store information about last_data_recv

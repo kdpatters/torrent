@@ -91,7 +91,7 @@ int chunkf_parse(char *fname, char **hashes, int **ids) {
  */
 int hash2id(char *hash, char *hashes, int *ids, int n_hashes) {
    for (int i = 0; i < n_hashes; i++) {
-       if (strncmp(hash, &hashes[i * CHK_HASH_BYTES], CHK_HASH_BYTES))
+       if (memcmp(hash, &hashes[i * CHK_HASH_BYTES], CHK_HASH_BYTES))
            return ids[i];
    }
 return -1;
@@ -156,7 +156,7 @@ void shahash(uint8_t *str, int len, uint8_t *hash) {
 int verify_hash(uint8_t *str, int len, uint8_t *hash) {
   uint8_t gen_hash[SHA1_HASH_SIZE];
   shahash(str, len, gen_hash);
-  return !strncmp((char *) hash, (char *) &gen_hash, SHA1_HASH_SIZE);
+  return !memcmp((char *) hash, (char *) &gen_hash, SHA1_HASH_SIZE);
 }
 
 /**
