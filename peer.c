@@ -232,7 +232,6 @@ void process_get(server_state_t *state, data_packet_t pct, struct sockaddr_in fr
     upload_t *upl;
     int up_emp = upload_first_empty(state);
   
-
     int buf_size = BT_CHUNK_SIZE; // Chunk-length
     char buf[buf_size]; 
     int id = hash2id(pct.data, state->mcf_hashes, state->mcf_ids, state->mcf_len);   // Convert the hash to hex, then get its id

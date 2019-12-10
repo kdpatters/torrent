@@ -13,20 +13,22 @@
 #include "upload.h"
 #include "download.h"
 #include "input_buffer.h"
-
+#include "debug.h"
 
 // Making packets after reading chunk
 void make_packets(upload_t *upl, char* buf, int buf_size) {
 
     int rem = buf_size % DATALEN;
     int listsize = buf_size / DATALEN + !!rem;
+    DPRINTF(DEBUG_UPLOAD, "make_packets: Splitting chunk across %d packets\n", listsize);
     data_packet_t *packs = malloc(sizeof(*packs) * listsize); // Array of packets to be created
     int offs = 0;
 
         // Divide into packets
-        for(int i = 0; i < listsize; i++) {
+        for (int i = 0; i < listsize; i++) {
             char* mem_curr = buf + offs; 
-            pct_data(&packs[i], i, mem_curr, (i == listsize - 1) ? rem : DATALEN);                
+            pct_data(&packs[i], i, mem_curr,
+                (i == (listsize - 1)) ? rem : DATALEN);         
             offs += DATALEN;
         }
         upl->chunk.packetlist = packs;

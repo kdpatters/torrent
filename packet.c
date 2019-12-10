@@ -25,7 +25,7 @@ maximum possible length.\n");
     }
     else if (packet_len <= 0) {
         fprintf(stderr, "Something went wrong: constructed packet has a \
-non-positive length.\n");
+non-positive length %d.\n", packet_len);
         exit(1); 
     }
 
@@ -81,7 +81,7 @@ void pct_get(data_packet_t *packet, char *hash) {
   pct_init(packet, GET_TYPE, 0, 0, hash, CHK_HASH_BYTES);                  
 }                                                                          
                                                                            
-void pct_data(data_packet_t *packet, int seq_num, char *data, char len) {
+void pct_data(data_packet_t *packet, int seq_num, char *data, int len) {
   DPRINTF(DEBUG_PACKETS, "Creating DATA packet\n"); 
   pct_init(packet, DATA_TYPE, seq_num, 0, data, len);                      
 }                                                                          
