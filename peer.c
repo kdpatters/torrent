@@ -24,6 +24,8 @@
 #include "server_state.h"
 #include "test_peer.h"
 
+#define PCT_TIMEOUT 999999
+
 void peer_run(bt_config_t *config);
 
 int main(int argc, char **argv) {
@@ -37,7 +39,7 @@ int main(int argc, char **argv) {
   config.identity = 3; // your group number here
   strcpy(config.chunk_file, "example/C.masterchunks");
   strcpy(config.has_chunk_file, "example/A.chunks");
-  test_peer();
+  peer_test();
   return 0;
 #endif
 
@@ -69,15 +71,27 @@ int id_in_ids(int id, int *ids, int ids_len) {
 
 /* Returns the id for a peer based on its IP address and port. */
 int peer_addr_to_id(struct sockaddr_in peer, server_state_t *state) {
+  DPRINTF(DEBUG_ALL, "peer_addr_to_id: Started\n");
   for (bt_peer_t *p = state->config->peers; p != NULL; p = p->next) {
     if ((p->addr.sin_port = peer.sin_port) && 
         (p->addr.sin_addr.s_addr = peer.sin_addr.s_addr)) {
           return p->id;
     }
   }
-fprintf(stderr, "Could not find peer ID for IP and port\n");
-exit(1);
-return -1; // Alternative behavior could be to simply ignore the packet
+  fprintf(stderr, "Could not find peer ID for IP and port\n");
+  exit(1);
+  return -1; // Alternative behavior could be to simply ignore the packet
+}
+
+struct sockaddr_in *peer_id_to_addr(int peer_id, server_state_t *state) {
+  DPRINTF(DEBUG_ALL, "peer_id_to_add: Started\n");
+  for (bt_peer_t *p = state->config->peers; p != NULL; p = p->next) {
+    if (p->id == peer_id) {
+      return &p->addr;
+    }
+  }
+  fprintf(stderr, "Could not find peer ID\n");
+  exit(1);
 }
 
 // Sends array of packets to every peer except sender
@@ -156,8 +170,8 @@ int get_n_hashes(data_packet_t pct) {
   char n = pct.data[0]; // Get the number of hashes in the packet
 
   if (n > MAX_CHK_HASHES) {
-    fprintf(stderr, "Received packet claims to contain more than \
-maximum number of hashes.\n");
+    fprintf(stderr, "get_n_hashes: Received packet claims to contain more than \
+maximum number of hashes with %d total.\n", n);
     exit(1);
   }
 
@@ -173,10 +187,9 @@ void process_whohas(server_state_t *state, data_packet_t pct, struct sockaddr_in
   for (int i = 0; i < n; i++) {
     char *hash = pct.data + PAYLOAD_TOPPER + i * CHK_HASH_BYTES;
 
-    int id = hash2id(hash, state->mcf_hashes, state->mcf_ids, state->mcf_len);
-
     // Check if the chunk is in the "has chunk file"
-    if (id_in_ids(id, state->hcf_ids, state->hcf_len)) {
+    int id = hash2id(hash, state->hcf_hashes, state->hcf_ids, state->hcf_len);
+    if (id >= 0) {
       strncpy(&matched[m++ * CHK_HASH_BYTES], hash, CHK_HASH_BYTES);
     }
   } 
@@ -186,7 +199,7 @@ void process_whohas(server_state_t *state, data_packet_t pct, struct sockaddr_in
   data_packet_t *packet_list = NULL;
   // The WHOHAS response should technically fit in only 1 packet...
   int n_packets = hashes2packets(&packet_list, matched, m, &pct_ihave);
-  DPRINTF(DEBUG_PACKETS, "process_whohas: Creating IHAVE %d packets for %d chunks",
+  DPRINTF(DEBUG_PACKETS, "process_whohas: Created %d IHAVE packets for %d chunks\n",
     n_packets, m);
   for (int i = 0; i < n_packets; i++)
     pct_send(&packet_list[i], &from, state->sock);
@@ -200,7 +213,8 @@ void process_ihave(server_state_t *state, data_packet_t pct, struct sockaddr_in 
   for (int i = 0; i < n; i++) {
     char *hash = pct.data + PAYLOAD_TOPPER + i * CHK_HASH_BYTES;
     int id = hash2id(hash, state->mcf_hashes, state->mcf_ids, state->mcf_len);
-    dload_peer_add(&state->download, from, id);
+    DPRINTF(DEBUG_PACKETS, "process_ihave: Read chunk id %d from packet\n", id);
+    dload_peer_add(&state->download, peer_addr_to_id(from, state), id);
   }
 }
 
@@ -314,17 +328,18 @@ void process_inbound_udp(int sock, server_state_t *state) {
 } 
 
 void dload_check_status(server_state_t *state) {                           
-    clock_t now = clock();                                                 
     download_t *download = &state->download;                               
-    clock_t time_passed = now - download->time_started;                    
+    double time_passed = difftime(time(0), download->time_started);    
     //int n = download->n_chunks;                                          
     // Number of chunks waiting to download                                
-    int w = download->n_chunks - download->n_in_progress;                  
+    //int w = download->n_chunks - download->n_in_progress;                  
     //chunkd_t *chunks = download->chunks;                                 
     /* Check if download is waiting for IHAVE responses and the timeout 
-     * has been surpassed. */                                              
+     * has been surpassed. */         
+//    DPRINTF(DEBUG_DOWNLOAD, "dload_check_status: Checking if it's time to send a GET request\n");
+//    DPRINTF(DEBUG_DOWNLOAD, "dload_check_status: Download has status %d and %gs have passed since the last IHAVE\n", download->waiting_ihave, time_passed);                                    
     if (download->waiting_ihave && (time_passed > TIME_WAIT_IHAVE)) {   
-        for (int i = 0; i < w; i++) {                                      
+      //  for (int i = 0; i < w; i++) {                                      
             int rarest = dload_rarest_chunk(download);                     
             chunkd_t *chunk = &download->chunks[rarest];                   
             //bt_peer_t *peer = bt_peer_info(state->config, chunk->peer_list[0]);
@@ -333,9 +348,12 @@ void dload_check_status(server_state_t *state) {
                 state->mcf_hashes, state->mcf_len);                        
             pct_get(&pack, hash);                                          
             // TODO: replace peer list with ids instead of addr            
-            // TODO: check if download in progress with given peer         
-            pct_send(&pack, chunk->peer_list, state->sock);                
-        }                                                               
+            // TODO: check if download in progress with given peer
+            if (chunk->pl_filled > 0) 
+                pct_send(&pack, peer_id_to_addr(chunk->peer_list[0], 
+                    state), state->sock);
+            download->waiting_ihave = 0; // Stop waiting for IHAVE             
+       // }                                                               
                                                                         
     }                                                                   
 }
@@ -398,15 +416,18 @@ void peer_run(bt_config_t *config) {
   
   spiffy_init(config->identity, (struct sockaddr *)&myaddr, sizeof(myaddr));
   
+  struct timeval pct_timeout;
   while (1) {
     int nfds;
+    pct_timeout.tv_usec = PCT_TIMEOUT;
+
     FD_SET(STDIN_FILENO, &readfds);
     FD_SET(sock, &readfds);
-    
-    nfds = select(sock+1, &readfds, NULL, NULL, NULL);
-    
-    dload_check_status(&state);
 
+    dload_check_status(&state);
+    
+    nfds = select(sock+1, &readfds, NULL, NULL, &pct_timeout);
+    
     if (nfds > 0) {
       if (FD_ISSET(sock, &readfds)) {
 	      process_inbound_udp(sock, &state);

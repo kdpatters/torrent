@@ -36,7 +36,8 @@ int helper_parse_chunkf(FILE *fp, char **hashes, int **ids) {
 	else { // Store the chunk's hash and id
 		char id[buf_size], hash[buf_size];
 		sscanf(buf, "%s %s", id, hash);
-		strncpy(&(*hashes)[n * CHK_HASH_BYTES], hash, CHK_HASH_BYTES);
+        ascii2hex(hash, CHK_HASH_ASCII, 
+            (uint8_t *) &(*hashes)[n * CHK_HASH_BYTES]);
 		(*ids)[n++] = atoi(id);
 	}
   }	
@@ -90,10 +91,21 @@ int chunkf_parse(char *fname, char **hashes, int **ids) {
  * given hash 'hash'.  If the ID is not found, the function will return -1.
  */
 int hash2id(char *hash, char *hashes, int *ids, int n_hashes) {
+   DPRINTF(DEBUG_CHUNKS, "hash2id: Converting hash to id\n");
    for (int i = 0; i < n_hashes; i++) {
-       if (memcmp(hash, &hashes[i * CHK_HASH_BYTES], CHK_HASH_BYTES))
+       char *arr_hash = &hashes[i * CHK_HASH_BYTES];
+//       char buf1[CHK_HASH_ASCII];
+//       char buf2[CHK_HASH_ASCII];
+//       hex2ascii((uint8_t *) hash, CHK_HASH_BYTES, buf1);
+//       hex2ascii((uint8_t *) arr_hash, CHK_HASH_BYTES, buf2);
+//       DPRINTF(DEBUG_CHUNKS, "hash2id: Comparing chunks\n%*s and\n%*s\n", 
+//           CHK_HASH_ASCII, buf1, CHK_HASH_ASCII, buf2);
+       if (memcmp(hash, arr_hash, CHK_HASH_BYTES) == 0) {
+           DPRINTF(DEBUG_CHUNKS, "hash2id: Successfully matched hash to id\n");
            return ids[i];
+       }
    }
+DPRINTF(DEBUG_CHUNKS, "hash2id: Failed to match hash with id\n");
 return -1;
 }
 

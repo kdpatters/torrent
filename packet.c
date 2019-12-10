@@ -20,12 +20,12 @@ void pct_init(data_packet_t *pack, char pack_type, int seq_num, int ack_num,
     short packet_len = sizeof(header_t) + payload_len;
     if (packet_len > PACKETLEN) {
         fprintf(stderr, "Something went wrong: constructed packet is longer than the \
-maximum possible length.");
+maximum possible length.\n");
         exit(1);
     }
     else if (packet_len <= 0) {
         fprintf(stderr, "Something went wrong: constructed packet has a \
-non-positive length.");
+non-positive length.\n");
         exit(1); 
     }
 
@@ -51,19 +51,29 @@ non-positive length.");
     DPRINTF(DEBUG_PACKETS, "pct_init: Created packet of type %d\n", pack->header.packet_type); 
 }
 
-void pct_whohas(data_packet_t *packet, char n_hashes, char *hashes) { 
-  DPRINTF(DEBUG_PACKETS, "Creating WHOHAS packet\n");   
-  char payload[DATALEN];                                                   
+/* Create a payload formatted with a chunk count, some amount of 
+ * padding then a series of chunk hashes. Used for WHOHAS and IHAVE
+ * packets. Returns the length of the payload. */
+int pct_hash_payload(char *payload, char n_hashes, char *hashes) {
   int hash_bytes = n_hashes * CHK_HASH_BYTES;                              
   int payload_len = PAYLOAD_TOPPER + hash_bytes;                           
   sprintf(payload, "%c%*c%*s", n_hashes, PADDING,                          
-    ' ', hash_bytes, hashes);                                              
+    ' ', hash_bytes, hashes);                  
+  return payload_len;                            
+}
+
+void pct_whohas(data_packet_t *packet, char n_hashes, char *hashes) { 
+  DPRINTF(DEBUG_PACKETS, "Creating WHOHAS packet\n");   
+  char payload[DATALEN];                                                   
+  int payload_len = pct_hash_payload(payload, n_hashes, hashes);
   pct_init(packet, WHOHAS_TYPE, 0, 0, payload, payload_len);               
 }                                                                          
                                                                            
 void pct_ihave(data_packet_t *packet, char n_hashes, char *hashes) {
   DPRINTF(DEBUG_PACKETS, "Creating IHAVE packet\n");       
-  pct_init(packet, IHAVE_TYPE, 0, 0, hashes, n_hashes * CHK_HASH_BYTES);
+  char payload[DATALEN];                                                   
+  int payload_len = pct_hash_payload(payload, n_hashes, hashes);
+  pct_init(packet, IHAVE_TYPE, 0, 0, payload, payload_len);
 }                                                                          
                                                                            
 void pct_get(data_packet_t *packet, char *hash) {

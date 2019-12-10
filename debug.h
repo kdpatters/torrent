@@ -30,8 +30,9 @@ extern unsigned int debug;
 #define DEBUG_CHUNKS    0x20    // DBTEXT:  Debug chunk parsing functions
 #define DEBUG_COMMANDS  0x40    // DBTEXT:  Debug commands (e.g. GET)
 #define DEBUG_PACKETS   0x80    // DBTEXT:  Debug packet creation
-
-#define DEBUG_ALL       0xff    // DBTEXT:  Show all debug messages
+#define DEBUG_DOWNLOAD 0x100    // DBTEXT:  Debug data download
+#define DEBUG_UPLOAD   0x200    // DBTEXT:  Debug data upload
+#define DEBUG_ALL      0x3ff    // DBTEXT:  Show all debug messages
 
 #ifdef __cplusplus
 extern "C" {
