@@ -70,5 +70,6 @@ typedef struct download_s {
   char *output_file[MAX_FILENAME];
 } download_t;
 
+int dload_rarest_chunk(download_t *download);
 char dload_peer_add(download_t *download, struct sockaddr_in peer, int chunk_id);
 void dload_start(download_t *, char *, int *, int);

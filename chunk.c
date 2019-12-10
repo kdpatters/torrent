@@ -85,15 +85,27 @@ int chunkf_parse(char *fname, char **hashes, int **ids) {
 }
 
 /*
-* Return the ID for a specific hash given as bytes.  If the ID is not
-* found, the function will return -1.
-*/
+ * Return the ID for a specific hash given as bytes.  Uses an array of hashes
+ * 'hashes' and an array of ids 'ids' of length 'n_hashes' to find the id of the
+ * given hash 'hash'.  If the ID is not found, the function will return -1.
+ */
 int hash2id(char *hash, char *hashes, int *ids, int n_hashes) {
    for (int i = 0; i < n_hashes; i++) {
        if (strncmp(hash, &hashes[i * CHK_HASH_BYTES], CHK_HASH_BYTES))
            return ids[i];
    }
 return -1;
+}
+
+/* 
+ * Given an array of hashes of length 'CHK_HASH_BYTES', return the hash 
+ * corresponding to the id 'id' or NULL if the id is not found.
+ */
+char *id2hash(int id, char *hashes, int n_hashes) {
+    if (id < n_hashes) {
+        return &hashes[id * CHK_HASH_BYTES];
+    }
+    return NULL;
 }
 
 /**

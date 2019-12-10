@@ -310,6 +310,33 @@ void process_inbound_udp(int sock, server_state_t *state) {
   }
 } 
 
+void dload_check_status(server_state_t *state) {                           
+    clock_t now = clock();                                                 
+    download_t *download = &state->download;                               
+    clock_t time_passed = now - download->time_started;                    
+    //int n = download->n_chunks;                                          
+    // Number of chunks waiting to download                                
+    int w = download->n_chunks - download->n_in_progress;                  
+    //chunkd_t *chunks = download->chunks;                                 
+    /* Check if download is waiting for IHAVE responses and the timeout 
+     * has been surpassed. */                                              
+    if (download->waiting_ihave && (time_passed > TIME_WAIT_IHAVE)) {   
+        for (int i = 0; i < w; i++) {                                      
+            int rarest = dload_rarest_chunk(download);                     
+            chunkd_t *chunk = &download->chunks[rarest];                   
+            //bt_peer_t *peer = bt_peer_info(state->config, chunk->peer_list[0]);
+            data_packet_t pack;                                            
+            char *hash = id2hash(chunk->chunk_id,                          
+                state->mcf_hashes, state->mcf_len);                        
+            pct_get(&pack, hash);                                          
+            // TODO: replace peer list with ids instead of addr            
+            // TODO: check if download in progress with given peer         
+            pct_send(&pack, chunk->peer_list, state->sock);                
+        }                                                               
+                                                                        
+    }                                                                   
+}
+
 void handle_user_input(char *line, void *cbdata) {
   char chunkf[128], outf[128];
   server_state_t *state = (server_state_t *) cbdata;
@@ -375,6 +402,8 @@ void peer_run(bt_config_t *config) {
     
     nfds = select(sock+1, &readfds, NULL, NULL, NULL);
     
+    dload_check_status(&state);
+
     if (nfds > 0) {
       if (FD_ISSET(sock, &readfds)) {
 	      process_inbound_udp(sock, &state);

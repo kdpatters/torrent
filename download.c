@@ -12,23 +12,24 @@
 #include "chunk.h"
 #include "download.h"
 #include "debug.h"
+#include "packet.h"
+#include "upload.h" // TODO: move dload_check_status to 'peer.c'
+#include "server_state.h"
 
 #define INVALID_FIELD 0
 
-void dload_check_status(download_t *download) {
-    clock_t now = clock();
-    clock_t time_passed = now - download->time_started;
-    //int n = download->n_chunks;
-    // Number of chunks waiting to download
-    int w = download->n_chunks - download->n_in_progress;
-    //chunkd_t *chunks = download->chunks;
-    /* Check if download is waiting for IHAVE responses and the timeout
-     * has been surpassed. */
-    if (download->waiting_ihave && (time_passed > TIME_WAIT_IHAVE)) {
-        for (int i = 0; i < w; i++) {
+int dload_rarest_chunk(download_t *download) {
+    // Find the rarest chunk
+    int n_peers = download->chunks[0].pl_filled;
+    int rarest = 0; // Index of rarest chunk in download array
+    for (int i = 0; i < download->n_chunks; i++) {
+        int count = download->chunks[i].pl_filled;
+        if (count < n_peers) {
+            rarest = i;
+            n_peers = count;
         }
-        
     }
+    return rarest;
 }
 
 /* Add a peer to the download information for a specific chunk. Returns 
@@ -63,6 +64,7 @@ void dload_start(download_t *download, char *hashes, int *ids,
   
   // Start the download timer
   download->time_started = clock();
+  download->waiting_ihave = 1;
 
   download->chunks = malloc(sizeof(*download->chunks) * n_hashes);
   DPRINTF(DEBUG_INIT, "dload_start: Copying hashes into chunk array\n");
