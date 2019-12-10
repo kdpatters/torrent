@@ -258,8 +258,20 @@ void process_data(server_state_t *state, data_packet_t pct, struct sockaddr_in f
   // Start the download of the next chunk
 }
 
-void process_ack(server_state_t *state, data_packet_t pct, struct sockaddr_in from) {
-  // Store ACK in uploads struct
+// Process ack upon receiv
+void process_ack(server_state_t *state, data_packet_t ack, struct sockaddr_in from) {
+  int p_id = peer_addr_to_id(from, state);
+  
+  for(int i = 0; i < MAX_UPLOADS; i++ {
+    if(state->uploads[i].chunk.peer_id == p_id) { // Find the specific upload matching requesting peer_id
+      state->uploads[i].recv[ack.header.ack_num] = 1; // 1 - index into rec using ack_num to indicate ack for that packet received
+      data_packet_t *next_pac = state->uploads[i].chunk.packetlist[ack.header.seq_num + 1]; // Get the next data packet
+      pct_send(next_pac, from, state->sock);  // Send 
+ 
+    }
+  } 
+  
+   // Store ACK in uploads struct
   // Send the next data packet
   // Update uploads struct sequence number
 }

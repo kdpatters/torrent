@@ -31,6 +31,8 @@ void make_packets(upload_t *upl, char* buf, int buf_size) {
         }
         upl->chunk.packetlist = packs;
         upl->chunk.l_size = listsize;
+        int *received_acks =  malloc(sizeof(received_acks) * listsize); // Initiaize and allocate array for future acks to be received
+        upl->recv = received_acks;
 }
 
 // Function to read a chunk based on its specific ID from a file;
@@ -72,17 +74,27 @@ char check_upload_peer(upload_t *upl, bt_config_t *cfg) {
 
 */
 
+
+// Check if ack receieved is a duplicate that was rec before for another packet
+char check_dup_ack(upload_t *upl, int sequence, data_packet *ack) {
+    int n_acks = upl->rec[sequence];
+    if(n_acks > 0)  // If current ack was already received before
+        n_acks++; // It is a duplicate
+    
+    return n_acks; // Otherwise not a dup
+}
+ 
 // Check when the last data packet was received
-/* 
-void check_retry_ack(upload_t *upl, int seq, struct sockaddr_in *dest, bt_config_t *co) {
+void check_retry_upl(upload_t *upl, int seq, struct sockaddr_in *dest, bt_config_t *co) {
 
     clock_t curr_time;
     curr_time = clock();
-    clock_t last_rec = upl->last_ack_rec;
+    clock_t last_ack = upl->last_ack_rec;
     
-    if((curr_time - last_rec) > T_OUT_ACK) {
+    if(((curr_time - last_ack) > T_OUT_ACK) || (check_dup_ack(upl, seq) > 0) { // Time-out occurs or dup ack rec
         pct_send(upl, seq, dest, co); // If not ack received
+
     }
 
 }
-*/
+
