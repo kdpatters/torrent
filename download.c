@@ -13,6 +13,7 @@
 #include "packet.h"
 #include "download.h"
 #include "debug.h"
+#include "peer_list.h"
 
 #define INVALID_FIELD 0
 
@@ -272,7 +273,7 @@ char dload_pick_peer(download_t *download, char *peer_free, int indx) {
 
     int peer_id = download->chunks[indx].peer_list[i];
 
-    if (peer_free[peer_id]) { // Found a free peer
+    if (peer_free[peer_id] == PEER_FREE) { // Found a free peer
       return peer_id;
     }
 
@@ -290,7 +291,7 @@ char dload_pick_peer(download_t *download, char *peer_free, int indx) {
  * 
  */
 char dload_pick_chunk(download_t *download, char *peer_free) {
-  DPRINTF(DEBUG_DOWNLOAD, "download_pick_chunk: Choosing next chunk to download\n");
+  DPRINTF(DEBUG_DOWNLOAD, "dload_pick_chunk: Choosing next chunk to download\n");
 
   // Create list of chunks from rarest to least rare
   chunkd_t *chks = download->chunks;
@@ -302,6 +303,7 @@ char dload_pick_chunk(download_t *download, char *peer_free) {
     int chunk_id = rarest[i];
     int peer_id = dload_pick_peer(download, peer_free, chunk_id);
 
+    DPRINTF(DEBUG_DOWNLOAD, "dload_pick_chunk: Testing whether peer id %d is valid\n", peer_id);
     if (peer_id > 0) { // Found a suitable peer
       chks[chunk_id].peer = peer_id;
       return chunk_id;
@@ -325,7 +327,7 @@ void dload_chunk(download_t *download, int indx, struct sockaddr_in *addr,
   
   download->waiting_ihave = 0; // Stop waiting for IHAVE
   chk->state = DOWNLOADING;
-  peer_free[chk->peer] = 0;
+  peer_free[chk->peer] = PEER_BUSY;
 }
 
 /* 

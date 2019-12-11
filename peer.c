@@ -23,6 +23,7 @@
 #include "download.h"
 #include "server_state.h"
 #include "test_peer.h"
+#include "peer_list.h"
 
 #define PCT_TIMEOUT 500000
 
@@ -325,7 +326,7 @@ void download_do_complete(server_state_t *state, chunkd_t *chk) {
       redownload_chk(state, chk);
 
     chk->state = COMPLETE;
-    state->peer_free[chk->peer] = 0; // Mark peer as free
+    state->peer_free[chk->peer] = PEER_FREE; // Mark peer as free
 
     // Start the download of the next chunk
     int chunk_indx = dload_pick_chunk(&state->download, state->peer_free);
@@ -520,7 +521,7 @@ int get_largest_peer_id(bt_config_t *config) {
 void peer_free_init(server_state_t *state) {
   state->peer_free_size = get_largest_peer_id(state->config) + 1;
   state->peer_free = malloc(sizeof(*state->peer_free) * state->peer_free_size);
-  memset(state->peer_free, 1, state->peer_free_size);
+  memset(state->peer_free, PEER_FREE, state->peer_free_size);
 }
 
 /*
