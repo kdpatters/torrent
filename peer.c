@@ -326,10 +326,6 @@ void download_do_complete(server_state_t *state, chunkd_t *chk) {
 
     chk->state = COMPLETE;
 
-    // Empty the pieces
-    free(chk->pieces);
-    free(chk->pieces_filled);
-
     // Start the download of the next chunk
     int chunk_indx = dload_pick_chunk(&state->download, state->peer_free);
     if (chunk_indx >= 0) {

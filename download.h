@@ -11,7 +11,7 @@
 // Chunk download statuses
 #define NOT_STARTED 0
 #define WAIT_IHAVE 1 // Waiting for IHAVE responses
-#define WAIT_DATA 2 // Waiting for data packets
+#define DOWNLOADING 2 // Waiting for data packets
 #define STALLED 3 // Download is unable to complete
 #define STOPPED 4 // Download has finished or user has stopped download
 #define COMPLETE 5
@@ -54,6 +54,7 @@ typedef struct chunkd_s {
 
 // Download of multiple requested chunks
 typedef struct download_s {
+  int initd; // Boolen for whether download has been initialized
   time_t time_started;
   int waiting_ihave;
 
@@ -76,3 +77,4 @@ void dload_assemble_chunk(chunkd_t *chk);
 char dload_verify_and_write_chunk(chunkd_t *chk, char *fname);
 void write_chunk(int id, char *fname, char *buf);
 int dload_cumul_ack(chunkd_t *chk);
+void dload_clear(download_t *);

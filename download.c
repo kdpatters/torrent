@@ -168,27 +168,68 @@ char dload_peer_add(download_t *download, int peer_id, int chunk_id) {
     return 0;                                                              
 }    
 
+/* 
+ * free_chunk
+ *
+ * Free arrays inside of a chunk.
+ */
+void free_chunk(chunkd_t *chk) {
+    DPRINTF(DEBUG_DOWNLOAD, "free_chunk: Freeing structs inside chunkd_t\n");
+    if (chk != NULL) {
+        if (chk->pl_size)
+            free(chk->peer_list);
+        if (chk->pieces_size) {
+            free(chk->pieces);
+            free(chk->pieces_filled);
+        }
+    }
+}
+
+/* 
+ * dload_clear
+ *
+ * Free allocated structures within download and set download struct 
+ * memory to 0 if it has previously been initialized.
+ */
+void dload_clear(download_t *download) {
+  if (!download->initd) // Download is not initialized
+    return;
+  DPRINTF(DEBUG_DOWNLOAD, "dload_clear: Freeing previously allocated chunks if any\n");
+  for (int i = 0; i < download->n_chunks; i++) {
+    free_chunk(&download->chunks[i]);
+  }
+  DPRINTF(DEBUG_DOWNLOAD, "dload_clear: Freeing the chunks array itself\n");
+  free(download->chunks); // Free the chunks array itselif
+
+  // Ensure that all parts of the download struct are 0
+  memset(download, 0, sizeof(*download)); 
+}
+
 /* Start the download process as a result of the GET command. */
 void dload_start(download_t *download, char *hashes, int *ids, 
   int n_hashes, char *outputf) {
-  DPRINTF(DEBUG_INIT, "dload_start: Initializing download\n");
+
+  DPRINTF(DEBUG_DOWNLOAD, "dload_start: Initializing download\n");
+  dload_clear(download); // Clear bits if already initialized
   
   // Start the download timer
   download->time_started = time(0);
   download->waiting_ihave = 1;
 
-  download->chunks = malloc(sizeof(*download->chunks) * n_hashes);
-  DPRINTF(DEBUG_INIT, "dload_start: Copying hashes into chunk array\n");
+  int chks_size = sizeof(*download->chunks) * n_hashes;  
+  download->chunks = malloc(chks_size);
+  memset(download->chunks, 0, chks_size);
+  DPRINTF(DEBUG_DOWNLOAD, "dload_start: Copying hashes into chunk array\n");
   for (int i = 0; i < n_hashes; i++) {
-    DPRINTF(DEBUG_INIT, "dload_start: Added chunk %d to array\n", ids[i]);
+    DPRINTF(DEBUG_DOWNLOAD, "dload_start: Added chunk %d to array\n", ids[i]);
     chunkd_t *chk = &download->chunks[i];
     chk->chunk_id = ids[i];
     strncpy(chk->hash, &hashes[i * CHK_HASH_BYTES], CHK_HASH_BYTES);
-    //chk->state = WAIT_IHAVE;
   }
   download->n_chunks = n_hashes;
   strncpy(download->output_file, outputf, MAX_FILENAME);
-  DPRINTF(DEBUG_INIT, "dload_start: Done\n");
+  download->initd = 1; // Download has now been initialized
+  DPRINTF(DEBUG_DOWNLOAD, "dload_start: Done\n");
 }
 
 /* 
@@ -263,10 +304,15 @@ void dload_chunk(download_t *download, int indx, struct sockaddr_in *addr,
   int sock) {
   DPRINTF(DEBUG_DOWNLOAD, "dload_chunk: Sending GET to initiate download process\n");
 
+  chunkd_t *chk = &download->chunks[indx];
+
+  // Send GET request for specific chunk
   data_packet_t pack;                                                                   
-  pct_get(&pack, download->chunks[indx].hash);                
+  pct_get(&pack, chk->hash);                
   pct_send(&pack, addr, sock); 
-  download->waiting_ihave = 0; // Stop waiting for IHAVE   
+  
+  download->waiting_ihave = 0; // Stop waiting for IHAVE
+  chk->state = DOWNLOADING;
 }
 
 /* 
