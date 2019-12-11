@@ -19,6 +19,8 @@
 void make_packets(upload_t *upl, char* buf, int buf_size) {
 
     int rem = buf_size % DATALEN;
+    DPRINTF(DEBUG_UPLOAD, "make_packets: Total data %d bytes\nMax packet size \
+%d bytes\nLast packet %d bytes\n", buf_size, DATALEN, rem);
     int listsize = buf_size / DATALEN + !!rem;
     DPRINTF(DEBUG_UPLOAD, "make_packets: Splitting chunk across %d packets\n", listsize);
     data_packet_t *packs = malloc(sizeof(*packs) * listsize); // Array of packets to be created
@@ -55,7 +57,8 @@ void read_chunk(upload_t *upl, char *filename, char *buf) {
         exit(1);
     }
     // Position pointer to where chunk located indicated by buf_size
-        fread(buf, BT_CHUNK_SIZE, 1, f); // Read a chunk
+    fread(buf, BT_CHUNK_SIZE, 1, f); // Read a chunk
+    fclose(f);
 }
 
 /* 

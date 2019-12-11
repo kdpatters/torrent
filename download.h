@@ -25,15 +25,6 @@
 // Filename lengths
 #define MAX_FILENAME 100
 
-// Each data node includes its sequence number and a pointer to a byte array
-typedef struct data_node_s {
-    int seq_num;
-    int data_len;
-    void *data;
-    struct data_node_s *prev;
-    struct data_node_s *next; 
-} data_node_t;
-
 // Download of a single chunk
 typedef struct chunkd_s {
   // Chunk info
@@ -54,7 +45,10 @@ typedef struct chunkd_s {
   
   // Data
   char data[BT_CHUNK_SIZE]; // Space reserved for entire chunk
-  data_node_t pieces;
+  data_packet_t *pieces;
+  int pieces_size;
+  int total_bytes;  // Size of pieces array
+  int *pieces_filled;
 } chunkd_t;
 
 // Download of multiple requested chunks
@@ -67,9 +61,9 @@ typedef struct download_s {
   int n_in_progress;
   chunkd_t *chunks;
 
-  char *output_file[MAX_FILENAME];
+  char output_file[MAX_FILENAME];
 } download_t;
 
 int dload_rarest_chunk(download_t *download);
 char dload_peer_add(download_t *download, int peer_id, int chunk_id);
-void dload_start(download_t *, char *, int *, int);
+void dload_start(download_t *, char *, int *, int, char *);
