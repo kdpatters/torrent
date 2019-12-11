@@ -169,9 +169,6 @@ char dload_peer_add(download_t *download, int peer_id, int chunk_id) {
       if ((chk->chunk_id == chunk_id)  && // Chunk id matches
          !(id_in_ids(peer_id, chk->peer_list, chk->pl_filled))) {                                     
       DPRINTF(DEBUG_DOWNLOAD, "dload_peer_add: Matched IHAVE chunk %d in chunks requested to download, adding peer %d\n", chunk_id, peer_id);         
-                                                                           
-       // Increment counter for number of IHAVE responses received
-       download->n_ihave_recv++; 
 
        // Resize the peer list if necessary                               
         if (chk->pl_size <= chk->pl_filled) {                              
@@ -237,6 +234,7 @@ void dload_start(download_t *download, char *hashes, int *ids,
   download->time_started = time(0);
   download->waiting_ihave = 1;
   download->n_ihave_waiting = n_ihave;
+  DPRINTF(DEBUG_DOWNLOAD, "dload_start: Waiting for %d IHAVEs\n", n_ihave);
 
   int chks_size = sizeof(*download->chunks) * n_hashes;  
   download->chunks = malloc(chks_size);
@@ -261,7 +259,11 @@ void dload_start(download_t *download, char *hashes, int *ids,
  */
 char dload_ihave_done(download_t *download) {                            
   double time_passed = difftime(time(0), download->time_started); 
-  return (download->waiting_ihave && (time_passed > TIME_WAIT_IHAVE));
+  int done =
+    download->waiting_ihave && 
+      ((time_passed > TIME_WAIT_IHAVE)
+      || (download->n_ihave_waiting == download->n_ihave_recv));
+    return done;
 }
 
 /* 

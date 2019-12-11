@@ -212,6 +212,9 @@ void process_whohas(server_state_t *state, data_packet_t pct, struct sockaddr_in
 
 void process_ihave(server_state_t *state, data_packet_t pct, struct sockaddr_in from) {
   char n = get_n_hashes(pct);
+                                                                       
+  /* Increment counter for number of IHAVE responses received. */
+  state->download.n_ihave_recv++; 
 
   // Parse the hashes from the packet
   for (int i = 0; i < n; i++) {
