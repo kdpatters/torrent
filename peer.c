@@ -332,7 +332,7 @@ void download_do_complete(server_state_t *state, chunkd_t *chk) {
     if (chunk_indx >= 0) {
       struct sockaddr_in *addr;
       addr = peer_id_to_addr(state->download.chunks[chunk_indx].peer, state);
-      dload_chunk(&state->download, chunk_indx, addr, state->sock);
+      dload_chunk(&state->download, chunk_indx, addr, state->sock, state->peer_free);
     } else { // Check if every chunk has been downloaded
       int n_chunks = state->download.n_chunks;
       int n_complete = 0;
@@ -463,7 +463,7 @@ void check_download_status(server_state_t *state) {
     if (chunk_indx >= 0) {
       struct sockaddr_in *addr;
       addr = peer_id_to_addr(state->download.chunks[chunk_indx].peer, state);
-      dload_chunk(&state->download, chunk_indx, addr, state->sock);
+      dload_chunk(&state->download, chunk_indx, addr, state->sock, state->peer_free);
     } else {
     /* Could not start a new downloading meaning either
      * 1) There are currently no free peers (or peers with the chunk)

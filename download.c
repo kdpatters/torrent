@@ -313,7 +313,7 @@ char dload_pick_chunk(download_t *download, char *peer_free) {
 }
 
 void dload_chunk(download_t *download, int indx, struct sockaddr_in *addr, 
-  int sock, int *peer_free) {
+  int sock, char *peer_free) {
   DPRINTF(DEBUG_DOWNLOAD, "dload_chunk: Sending GET to initiate download process\n");
 
   chunkd_t *chk = &download->chunks[indx];
@@ -325,7 +325,7 @@ void dload_chunk(download_t *download, int indx, struct sockaddr_in *addr,
   
   download->waiting_ihave = 0; // Stop waiting for IHAVE
   chk->state = DOWNLOADING;
-  //peer_free[chk->peer] = 0;
+  peer_free[chk->peer] = 0;
 }
 
 /* 
