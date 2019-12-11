@@ -32,6 +32,22 @@ void write_chunk(int id, char *fname, char *buf) {
   fclose(f);
 }
 
+/* 
+ * dload_cumul_ack
+ *
+ * Returns the number to use to create a cumulative ACK for a given
+ * chunk download.
+ */
+int dload_cumul_ack(chunkd_t *chk) {
+    for (int i = 0; i < chk->pieces_size; i++) {
+        if (chk->pieces_filled[i] == 0) {
+            return i - 1;
+        }
+    }
+    fprintf(stderr, "Cannot create ACK.  No pieces have been stored yet for this chunk\n");
+    exit(1);
+}
+
 // Returns true if chukn is verified and written to disk correctly.
 char dload_verify_and_write_chunk(chunkd_t *chk, char *fname) {
   if (verify_hash((uint8_t *) chk->data, chk->total_bytes, (uint8_t *) chk->hash)) {
