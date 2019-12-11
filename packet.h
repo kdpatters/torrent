@@ -23,7 +23,7 @@
 #define CHK_COUNT sizeof(char)
 #define PAYLOAD_TOPPER (char) (CHK_COUNT + PADDING)
 #define HEADER_SIZE sizeof(header_t)
-#define DATALEN ((int)(PACKETLEN - HEADER_SIZE))
+#define DATALEN ((uint) (PACKETLEN - HEADER_SIZE))
 #define SPACELEFT (DATALEN - PADDING - CHK_COUNT)
 #define MAX_CHK_HASHES (SPACELEFT / CHK_HASH_BYTES)
 
@@ -46,7 +46,7 @@ void pct_init(data_packet_t *, char, int, int, char *, int);
 void pct_whohas(data_packet_t *packet, char n_hashes, char *hashes);
 void pct_ihave(data_packet_t *packet, char n_hashes, char *hashes);
 void pct_get(data_packet_t *packet, char *hash);
-void pct_data(data_packet_t *packet, int seq_num, char *data, char len);
+void pct_data(data_packet_t *packet, int seq_num, char *data, int len);
 void pct_ack(data_packet_t *packet, int ack_num);
 void pct_denied(data_packet_t *packet);
 void pct_send(data_packet_t *, struct sockaddr_in *, int);

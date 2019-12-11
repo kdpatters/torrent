@@ -2,11 +2,11 @@
 CC 		= gcc
 CFLAGS		= -g -Wall -DDEBUG
 LDFLAGS		= -lm
-TESTDEFS	= -DTESTING			# comment this out to disable debugging code
+#TESTDEFS	= -DTESTING			# comment this out to disable debugging code
 OBJS		= peer.o bt_parse.o download.o upload.o spiffy.o debug.o input_buffer.o chunk.o sha.o packet.o test_peer.o
 MK_CHUNK_OBJS   = make_chunks.o chunk.o sha.o debug.o
 
-BINS            = peer make-chunks test-peer
+BINS            = peer make-chunks
 TESTBINS        = test_debug test_input_buffer
 
 # Implicit .o target
@@ -20,13 +20,10 @@ all: ${BINS} ${TESTBINS}
 run: peer_run
 	./peer_run
 
-test: test-peer
-	./test-peer
+test: peer_test
+	./peer_test
 
 peer: $(OBJS)
-	$(CC) $(CFLAGS) $(OBJS) -o $@ $(LDFLAGS)
-
-test-peer: $(OBJS)
 	$(CC) $(CFLAGS) $(OBJS) -o $@ $(LDFLAGS)
 
 make-chunks: $(MK_CHUNK_OBJS)

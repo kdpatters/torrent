@@ -12,44 +12,46 @@
 #include "chunk.h"
 #include "download.h"
 #include "debug.h"
+#include "packet.h"
 
 #define INVALID_FIELD 0
 
-void dload_check_status(download_t *download) {
-    clock_t now = clock();
-    clock_t time_passed = now - download->time_started;
-    //int n = download->n_chunks;
-    // Number of chunks waiting to download
-    int w = download->n_chunks - download->n_in_progress;
-    //chunkd_t *chunks = download->chunks;
-    /* Check if download is waiting for IHAVE responses and the timeout
-     * has been surpassed. */
-    if (download->waiting_ihave && (time_passed > TIME_WAIT_IHAVE)) {
-        for (int i = 0; i < w; i++) {
+int dload_rarest_chunk(download_t *download) {
+    // Find the rarest chunk
+    int n_peers = download->chunks[0].pl_filled;
+    int rarest = 0; // Index of rarest chunk in download array
+    for (int i = 0; i < download->n_chunks; i++) {
+        int count = download->chunks[i].pl_filled;
+        if (count < n_peers) {
+            rarest = i;
+            n_peers = count;
         }
-        
     }
+    return rarest;
 }
 
 /* Add a peer to the download information for a specific chunk. Returns 
  * True if the peer was added successfully. */                             
-char dload_peer_add(download_t *download, struct sockaddr_in peer, int chunk_id) {
+char dload_peer_add(download_t *download, int peer_id, int chunk_id) {
+    DPRINTF(DEBUG_DOWNLOAD, "dload_peer_add: Adding information for chunks peer has\n");
     // Iterate through requested chunks                                    
     for (int i = 0; i < download->n_chunks; i++) {                         
       chunkd_t *chk = &download->chunks[i];                                
                                                                            
-      // Check if we found the IHAVE chunk in the requested chunks         
+      // Check if we found the IHAVE chunk in the requested chunks
       if (chk->chunk_id == chunk_id) {                                     
+      DPRINTF(DEBUG_DOWNLOAD, "dload_peer_add: Matched IHAVE chunk %d in chunks requested to download, adding peer %d\n", chunk_id, peer_id);         
                                                                            
         // Resize the peer list if necessary                               
         if (chk->pl_size <= chk->pl_filled) {                              
-          chk->pl_size = 0 ? chk->pl_size * 2 : 1;                         
+          chk->pl_size = chk->pl_size ? chk->pl_size * 2 : 1;                         
           chk->peer_list = realloc(chk->peer_list,                         
              sizeof(*chk->peer_list) * chk->pl_size);                      
         }                                                                  
                                                                            
         // Finally add the peer                                            
-        memcpy(&chk->peer_list[chk->pl_filled++], &peer, sizeof(peer)); 
+        chk->peer_list[chk->pl_filled++] = peer_id;
+        DPRINTF(DEBUG_DOWNLOAD, "dload_peer_add: Chunk %d now has %d peers\n", chunk_id, chk->pl_filled);
         return 1;                                                          
       }                                                                    
     }                                                                      
@@ -62,16 +64,19 @@ void dload_start(download_t *download, char *hashes, int *ids,
   DPRINTF(DEBUG_INIT, "dload_start: Initializing download\n");
   
   // Start the download timer
-  download->time_started = clock();
+  download->time_started = time(0);
+  download->waiting_ihave = 1;
 
   download->chunks = malloc(sizeof(*download->chunks) * n_hashes);
   DPRINTF(DEBUG_INIT, "dload_start: Copying hashes into chunk array\n");
   for (int i = 0; i < n_hashes; i++) {
+    DPRINTF(DEBUG_INIT, "dload_start: Added chunk %d to array\n", ids[i]);
     chunkd_t *chk = &download->chunks[i];
     chk->chunk_id = ids[i];
     strncpy(chk->hash, &hashes[i * CHK_HASH_BYTES], CHK_HASH_BYTES);
     chk->state = WAIT_IHAVE;
   }
+  download->n_chunks = n_hashes;
   DPRINTF(DEBUG_INIT, "dload_start: Done\n");
 }
 

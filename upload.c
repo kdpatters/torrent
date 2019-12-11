@@ -91,8 +91,8 @@ void check_retry_upl(upload_t *upl, int seq, struct sockaddr_in *dest, bt_config
     curr_time = clock();
     clock_t last_ack = upl->last_ack_rec;
     
-    if(((curr_time - last_ack) > T_OUT_ACK) || (check_dup_ack(upl, seq) > 0) { // Time-out occurs or dup ack rec
-        pct_send(upl, seq, dest, co); // If not ack received
+    if(((curr_time - last_ack) > T_OUT_ACK) || (check_dup_ack(upl, seq) == 4) { // Time-out occurs or dup ack rec 3 times, incrementing 2 - 3 - 4
+        pct_send(upl, seq, dest, co); // in recv array 
 
     }
 

@@ -39,7 +39,6 @@ typedef struct chunku_s {
 
  typedef struct upload {
     chunku_t chunk;// Chunk to upload 
-    int ack_ind; // Ack no. as int to index into recv
     clock_t t_start_send;
     int *recv; // To keep count of packets sent for upload and recv
     int busy; // Busy -- 1, Not busy - 0  

@@ -20,7 +20,7 @@
 #define GET_WINDOW (MS_TO_S * 5)
 #define DATA_WINDOW (MS_TO_S * 5)
 #define MAX_RETRIES_GET 3
-#define TIME_WAIT_IHAVE MS_TO_S * 5
+#define TIME_WAIT_IHAVE 5 // Timeout in seconds
 
 // Filename lengths
 #define MAX_FILENAME 100
@@ -41,16 +41,16 @@ typedef struct chunkd_s {
   char hash[CHK_HASH_BYTES];
 
   // Peer list to store IHAVE responses
-  struct sockaddr_in *peer_list;
+  int *peer_list;
   int pl_filled;
   int pl_size;
     
   // Chunk download status
   int state;
-  struct sockaddr_in peer;
+  int peer;
   int n_tries_get;
-  clock_t last_get_sent;
-  clock_t last_data_recv;
+  time_t last_get_sent;
+  time_t last_data_recv;
   
   // Data
   char data[BT_CHUNK_SIZE]; // Space reserved for entire chunk
@@ -59,7 +59,7 @@ typedef struct chunkd_s {
 
 // Download of multiple requested chunks
 typedef struct download_s {
-  clock_t time_started;
+  time_t time_started;
   int waiting_ihave;
 
   // Chunk info
@@ -70,5 +70,6 @@ typedef struct download_s {
   char *output_file[MAX_FILENAME];
 } download_t;
 
-char dload_peer_add(download_t *download, struct sockaddr_in peer, int chunk_id);
+int dload_rarest_chunk(download_t *download);
+char dload_peer_add(download_t *download, int peer_id, int chunk_id);
 void dload_start(download_t *, char *, int *, int);

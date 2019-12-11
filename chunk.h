@@ -25,6 +25,7 @@ void binary2hex(uint8_t *buf, int len, char *ascii);
 /* converts an ascii to hex */
 void hex2binary(char *hex, int len, uint8_t*buf);
 
+char *id2hash(int, char *, int);
 int hash2id(char *, char *, int *, int);
 int masterchunkf_parse(char *, char **, int **, char **);
 int chunkf_parse(char *, char **, int **);
