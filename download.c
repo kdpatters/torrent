@@ -16,22 +16,30 @@
 
 #define INVALID_FIELD 0
 
+void write_chunk(int id, char *fname, char *buf) {
+  FILE *f = fopen(fname, "r+");
+  if (f == NULL) {
+    fprintf(stderr, "Problem opening file %s\n", fname);
+    exit(1);
+  }
+  int position = id * BT_CHUNK_SIZE;
+  int whence = SEEK_SET; // Offset bytes set to start of file
+  if (fseek(f, position, whence)) {
+      fprintf(stderr, "Could not read chunk %d\n", id);
+      exit(1);
+  }
+  fwrite(buf, BT_CHUNK_SIZE, 1, f); // Read a chunk
+  fclose(f);
+}
+
 // Returns true if chukn is verified and written to disk correctly.
 char dload_verify_and_write_chunk(chunkd_t *chk, char *fname) {
   if (verify_hash((uint8_t *) chk->data, chk->total_bytes, (uint8_t *) chk->hash)) {
-      DPRINTF(DEBUG_DOWNLOAD, 
-        "dload_verify_and_write_chunk: Chunk %d successfully downloaded!\n", 
-        chk->chunk_id);
-
-      // Write the chunk to disk
-      FILE *f = fopen(fname, "w+");
-      if (f == NULL) {
-        fprintf(stderr, "Could not open output file %s\n", fname);
-        exit(1);
-      }
-      fwrite(chk->data, chk->total_bytes, 1, f);
-      fclose(f);
-      return 0;
+    DPRINTF(DEBUG_DOWNLOAD, 
+      "dload_verify_and_write_chunk: Chunk %d successfully downloaded!\n", 
+      chk->chunk_id);
+    write_chunk(chk->chunk_id, fname, chk->data);
+    return 0;
   }
   return 1;
 }
@@ -86,16 +94,30 @@ char dload_complete(chunkd_t *chk) {
   return (chk->total_bytes >= BT_CHUNK_SIZE);
 }
 
+/* Returns the index of a chunk in the downloads array or -1 if all the chunks
+ * have finished downloading. */
 int dload_rarest_chunk(download_t *download) {
+    int n_peers;
+    int rarest = -1; // Index of rarest chunk in download array
     // Find the rarest chunk
-    int n_peers = download->chunks[0].pl_filled;
-    int rarest = 0; // Index of rarest chunk in download array
     for (int i = 0; i < download->n_chunks; i++) {
-        int count = download->chunks[i].pl_filled;
-        if (count < n_peers) {
-            rarest = i;
-            n_peers = count;
-        }
+      int state = download->chunks[i].state;
+      if (state == NOT_STARTED) {
+        rarest = i;
+        n_peers = download->chunks[i].pl_filled;
+      }
+    }
+    if (rarest == -1) {
+      return rarest; // All chunks are finished downloading
+    }
+
+    for (int i = rarest; i < download->n_chunks; i++) {
+      int count = download->chunks[i].pl_filled;
+      int state = download->chunks[i].state;
+      if ((state == NOT_STARTED) && (count < n_peers)) {
+          rarest = i;
+          n_peers = count;
+      }
     }
     return rarest;
 }
@@ -144,7 +166,7 @@ void dload_start(download_t *download, char *hashes, int *ids,
     chunkd_t *chk = &download->chunks[i];
     chk->chunk_id = ids[i];
     strncpy(chk->hash, &hashes[i * CHK_HASH_BYTES], CHK_HASH_BYTES);
-    chk->state = WAIT_IHAVE;
+    //chk->state = WAIT_IHAVE;
   }
   download->n_chunks = n_hashes;
   strncpy(download->output_file, outputf, MAX_FILENAME);
@@ -169,12 +191,12 @@ char dload_ihave_done(download_t *download) {
  * found, returns -1;
  */
 char dload_pick_peer(download_t *download, char *peer_free, int indx) {
-  DPRINTF(DEBUG_DOWNLOAD, "download_pick_peer: Looking for suitable peer from which to download chunk\n");
+  DPRINTF(DEBUG_DOWNLOAD, "dload_pick_peer: Looking for suitable peer from which to download chunk\n");
 
   // Iterate through peers for given chunk and check if each is free
   for (int i = 0; i < download->chunks[indx].pl_filled; i++) {
 
-    int peer_id = download->chunks[indx].peer_list[indx];
+    int peer_id = download->chunks[indx].peer_list[i];
 
     if (peer_free[peer_id]) { // Found a free peer
       return peer_id;
@@ -197,16 +219,20 @@ char dload_pick_chunk(download_t *download, char *peer_free) {
   DPRINTF(DEBUG_DOWNLOAD, "download_pick_chunk: Choosing next chunk to download\n");
 
   // Create list of chunks from rarest to least rare
-  int rarest = dload_rarest_chunk(download);                     
+  int rarest = dload_rarest_chunk(download);     
+  if (rarest <= 0)
+    return -1; // All chunks have been downloaded
+
   chunkd_t *rarest_chunks = &download->chunks[rarest];
 
+  // TODO make create a rarest chunks list so this is non trivial
   // Iterate through the list and try to find a chunk with at least one free peer
   for (int i = 0; i < 1; i++) {
 
     int peer_id = dload_pick_peer(download, peer_free, i);
     if (peer_id > 0) { // Found a suitable peer
       rarest_chunks[i].peer = peer_id;
-      return i;
+      return rarest;
 
     }
 

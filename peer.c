@@ -84,7 +84,7 @@ int peer_addr_to_id(struct sockaddr_in peer, server_state_t *state) {
 }
 
 struct sockaddr_in *peer_id_to_addr(int peer_id, server_state_t *state) {
-  DPRINTF(DEBUG_ALL, "peer_id_to_add: Started\n");
+  DPRINTF(DEBUG_ALL, "peer_id_to_addr: Started\n");
   for (bt_peer_t *p = state->config->peers; p != NULL; p = p->next) {
     if (p->id == peer_id) {
       return &p->addr;
@@ -136,6 +136,19 @@ int hashes2packets(data_packet_t **packet_list, char *hashes,
   return list_size;
 }
 
+void blank_file(char *fname, int n_chunks) {
+  FILE *f = fopen(fname, "w");
+  if (f == NULL) {
+    fprintf(stderr, "Problem opening file %s\n", fname);
+    exit(1);
+  }
+  char buf[BT_CHUNK_SIZE];
+  memset(buf, 0, sizeof(buf));
+  for (int i = 0; i < n_chunks; i++) {
+    fwrite(buf, sizeof(buf), 1, f);
+  }
+}
+
 // Executes a user specified "GET <chunk list> <output file>" command
 void cmd_get(char *chunkf, char *outputf, server_state_t *state) {
   DPRINTF(DEBUG_COMMANDS, "cmd_get: Executing get command\n");
@@ -154,6 +167,7 @@ void cmd_get(char *chunkf, char *outputf, server_state_t *state) {
 
   // Start the download process
   dload_start(&state->download, hashes, ids, n_hashes, outputf);
+  blank_file(outputf, state->mcf_len);
 
   free(hashes);
   free(ids);
@@ -241,7 +255,7 @@ void process_get(server_state_t *state, data_packet_t pct, struct sockaddr_in fr
       upl = &state->uploads[up_emp];
       upl->peer_id = peer_addr_to_id(from, state);
       upl->chunk.chunk_id = id;
-      read_chunk(upl, state->dataf, buf); // Reads chunk from Data file in Master chunkfile
+      read_chunk(upl->chunk.chunk_id, state->dataf, buf); // Reads chunk from Data file in Master chunkfile
       make_packets(upl, buf, buf_size); // Split chunk into packets
       upl->busy = BUSY; // Change upload status 
       pct_send(&upl->chunk.packetlist[upl->seq_num++], &from, state->sock);  // Send first packet
@@ -283,21 +297,54 @@ void redownload_chk(server_state_t *state, chunkd_t *chk) {
       state), state->sock);
 }
 
+void finish_file(server_state_t *state, char *fname) {
+  int *ids = state->hcf_ids;
+  int n = state->hcf_len;
+  char *dataf = state->dataf;
+
+  for (int i = 0; i < n; i++) {
+    char buf[BT_CHUNK_SIZE];
+    int id = ids[i];
+    read_chunk(id, dataf, buf);
+    write_chunk(id, fname, buf);
+  }
+
+}
+
+/* Check if download of chunk is complete, and if so execute various actions. */
 void download_do_complete(server_state_t *state, chunkd_t *chk) {
   // Check if download is complete, if so verify chunk then write to disk
   if (dload_complete(chk)) {
-    DPRINTF(DEBUG_DOWNLOAD, "process_data: Combining pieces of chunk\n");
+    DPRINTF(DEBUG_DOWNLOAD, "download_do_complete: Combining pieces of chunk\n");
     dload_assemble_chunk(chk);
 
-    DPRINTF(DEBUG_DOWNLOAD, "process_data: Verifying the chunk\n");
+    DPRINTF(DEBUG_DOWNLOAD, "download_do_complete: Verifying the chunk\n");
     // Verify and write the chunk to disk
     char *fname = state->download.output_file; 
     if (dload_verify_and_write_chunk(chk, fname)) 
       redownload_chk(state, chk);
 
+    chk->state = COMPLETE;
+
     // Empty the pieces
     free(chk->pieces);
     free(chk->pieces_filled);
+
+    // Start the download of the next chunk
+    int chunk_indx = dload_pick_chunk(&state->download, state->peer_free);
+    if (chunk_indx >= 0) {
+      struct sockaddr_in *addr;
+      addr = peer_id_to_addr(state->download.chunks[chunk_indx].peer, state);
+      dload_chunk(&state->download, chunk_indx, addr, state->sock);
+    } else { // Check if every chunk has been downloaded
+      DPRINTF(DEBUG_DOWNLOAD, "All chunks have been downloaded...finishing file\n");
+      int n_chunks = state->download.n_chunks;
+      int n_complete = 0;
+      for (int i = 0; i < n_chunks; i++)
+        n_complete += (state->download.chunks[i].state == COMPLETE);
+      if (n_complete == n_chunks) // If download is completely done, finish file
+        finish_file(state, state->download.output_file);
+    }
   }
 }
 

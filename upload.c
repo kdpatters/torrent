@@ -39,7 +39,7 @@ void make_packets(upload_t *upl, char* buf, int buf_size) {
 }
 
 // Function to read a chunk based on its specific ID from a file;
-void read_chunk(upload_t *upl, char *filename, char *buf) {
+void read_chunk(int id, char *filename, char *buf) {
     // Open chunkfile
     FILE *f;
     f = fopen(filename, "r");
@@ -48,7 +48,6 @@ void read_chunk(upload_t *upl, char *filename, char *buf) {
         exit(1);
     }
 
-    int id = upl->chunk.chunk_id;
     int position = id * BT_CHUNK_SIZE;
     int whence = SEEK_SET; // Offset bytes set to start of file
 

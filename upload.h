@@ -41,4 +41,4 @@ typedef struct chunku_s {
 } upload_t;
 
 void make_packets(upload_t *upl, char* buf, int buf_size);
-void read_chunk(upload_t *upl, char *filename, char *buf);
+void read_chunk(int id, char *filename, char *buf);

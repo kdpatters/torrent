@@ -14,6 +14,7 @@
 #define WAIT_DATA 2 // Waiting for data packets
 #define STALLED 3 // Download is unable to complete
 #define STOPPED 4 // Download has finished or user has stopped download
+#define COMPLETE 5
 
 // Download windows
 #define MS_TO_S 1000
@@ -73,3 +74,4 @@ char dload_complete(chunkd_t *chk);
 void dload_store_data(chunkd_t *chk, data_packet_t pct);
 void dload_assemble_chunk(chunkd_t *chk);
 char dload_verify_and_write_chunk(chunkd_t *chk, char *fname);
+void write_chunk(int id, char *fname, char *buf);
