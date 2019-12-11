@@ -112,32 +112,47 @@ char dload_complete(chunkd_t *chk) {
   return (chk->total_bytes >= BT_CHUNK_SIZE);
 }
 
-/* Returns the index of a chunk in the downloads array or -1 if all the chunks
- * have finished downloading. */
-int dload_rarest_chunk(download_t *download) {
-    int n_peers;
-    int rarest = -1; // Index of rarest chunk in download array
-    // Find the rarest chunk
-    for (int i = 0; i < download->n_chunks; i++) {
-      int state = download->chunks[i].state;
+/* 
+ * dload_rarest_chunk
+ *
+ * Stores list of indexes for chunks in download struct from rarest to
+ * least rare in list 'chunks'.  Stores -1 for an index if the chunk
+ * is busy or finished downloading already.
+ */
+int dload_rarest_chunk(int *rarest, download_t *download) {
+    // Copy chunk values into an array for sorting
+    struct elm {
+        uint indx;
+        uint val;
+    };
+    chunkd_t *chks = download->chunks;
+    int n = download->n_chunks;
+    int filled = 0;
+    struct elm sorting[n];
+    for (int i = 0; i < n; i++) {
+      int state = chks[i].state;
       if (state == NOT_STARTED) {
-        rarest = i;
-        n_peers = download->chunks[i].pl_filled;
+         sorting[filled].val = chks[i].pl_filled;
+         sorting[filled++].indx = i;
       }
-    }
-    if (rarest == -1) {
-      return rarest; // All chunks are finished downloading
     }
 
-    for (int i = rarest; i < download->n_chunks; i++) {
-      int count = download->chunks[i].pl_filled;
-      int state = download->chunks[i].state;
-      if ((state == NOT_STARTED) && (count < n_peers)) {
-          rarest = i;
-          n_peers = count;
-      }
+    // Insertion sort
+    for (int i = 0; i < filled - 1; i++) {
+        int j = i + 1;
+        for (; (j > 0) && (sorting[j - 1].val > sorting[j].val); j--) {
+            // Make a swap
+            struct elm temp = sorting[j - 1];
+            memcpy(&sorting[j - 1], &sorting[j], sizeof(sorting[j]));
+            memcpy(&sorting[j], &temp, sizeof(temp));
+        }
     }
-    return rarest;
+   
+    // Copy struct indicies into "rarest" list
+    for (int i = 0; i < filled; i++) {
+        rarest[i] = sorting[i].val;
+    }
+    return filled;
 }
 
 /* Add a peer to the download information for a specific chunk. Returns 
@@ -278,21 +293,18 @@ char dload_pick_chunk(download_t *download, char *peer_free) {
   DPRINTF(DEBUG_DOWNLOAD, "download_pick_chunk: Choosing next chunk to download\n");
 
   // Create list of chunks from rarest to least rare
-  int rarest = dload_rarest_chunk(download);     
-  if (rarest <= 0)
-    return -1; // All chunks have been downloaded
+  chunkd_t *chks = download->chunks;
+  int rarest[download->n_chunks];
+  int n_rarest = dload_rarest_chunk(rarest, download);     
 
-  chunkd_t *rarest_chunks = &download->chunks[rarest];
-
-  // TODO make create a rarest chunks list so this is non trivial
   // Iterate through the list and try to find a chunk with at least one free peer
-  for (int i = 0; i < 1; i++) {
+  for (int i = 0; i < n_rarest; i++) {
+    int chunk_id = rarest[i];
+    int peer_id = dload_pick_peer(download, peer_free, chunk_id);
 
-    int peer_id = dload_pick_peer(download, peer_free, i);
     if (peer_id > 0) { // Found a suitable peer
-      rarest_chunks[i].peer = peer_id;
-      return rarest;
-
+      chks[chunk_id].peer = peer_id;
+      return chunk_id;
     }
 
   }
@@ -301,7 +313,7 @@ char dload_pick_chunk(download_t *download, char *peer_free) {
 }
 
 void dload_chunk(download_t *download, int indx, struct sockaddr_in *addr, 
-  int sock) {
+  int sock, int *peer_free) {
   DPRINTF(DEBUG_DOWNLOAD, "dload_chunk: Sending GET to initiate download process\n");
 
   chunkd_t *chk = &download->chunks[indx];
@@ -313,6 +325,7 @@ void dload_chunk(download_t *download, int indx, struct sockaddr_in *addr,
   
   download->waiting_ihave = 0; // Stop waiting for IHAVE
   chk->state = DOWNLOADING;
+  //peer_free[chk->peer] = 0;
 }
 
 /* 

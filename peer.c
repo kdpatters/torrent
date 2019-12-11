@@ -325,6 +325,7 @@ void download_do_complete(server_state_t *state, chunkd_t *chk) {
       redownload_chk(state, chk);
 
     chk->state = COMPLETE;
+    state->peer_free[chk->peer] = 0; // Mark peer as free
 
     // Start the download of the next chunk
     int chunk_indx = dload_pick_chunk(&state->download, state->peer_free);
@@ -333,12 +334,13 @@ void download_do_complete(server_state_t *state, chunkd_t *chk) {
       addr = peer_id_to_addr(state->download.chunks[chunk_indx].peer, state);
       dload_chunk(&state->download, chunk_indx, addr, state->sock);
     } else { // Check if every chunk has been downloaded
-      DPRINTF(DEBUG_DOWNLOAD, "All chunks have been downloaded...finishing file\n");
       int n_chunks = state->download.n_chunks;
       int n_complete = 0;
       for (int i = 0; i < n_chunks; i++)
         n_complete += (state->download.chunks[i].state == COMPLETE);
+      DPRINTF(DEBUG_DOWNLOAD, "download_do_complete: %d / %d chunks are complete so far\n", n_complete, n_chunks);
       if (n_complete == n_chunks) // If download is completely done, finish file
+        DPRINTF(DEBUG_DOWNLOAD, "All chunks have been downloaded...finishing file\n");
         finish_file(state, state->download.output_file);
     }
   }
