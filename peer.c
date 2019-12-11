@@ -437,41 +437,29 @@ void process_inbound_udp(int sock, server_state_t *state) {
     default:
       DPRINTF(DEBUG_SOCKETS, "Packet type %d not understood.\n", pct_type);
   }
-} 
+}
 
-void dload_check_status(server_state_t *state) {                           
-    download_t *download = &state->download;                               
-    double time_passed = difftime(time(0), download->time_started);    
-    //int n = download->n_chunks;                                          
-    // Number of chunks waiting to download                                
-    //int w = download->n_chunks - download->n_in_progress;                  
-    //chunkd_t *chunks = download->chunks;                                 
-    /* Check if download is waiting for IHAVE responses and the timeout 
-     * has been surpassed. */         
-//    DPRINTF(DEBUG_DOWNLOAD, "dload_check_status: Checking if it's time to send a GET request\n");
-//    DPRINTF(DEBUG_DOWNLOAD, "dload_check_status: Download has status %d and %gs have passed since the last IHAVE\n", download->waiting_ihave, time_passed);                                    
-    if (download->waiting_ihave && (time_passed > TIME_WAIT_IHAVE)) {   
-      //  for (int i = 0; i < w; i++) {                                      
-            int rarest = dload_rarest_chunk(download);                     
-            chunkd_t *chunk = &download->chunks[rarest];                   
-            //bt_peer_t *peer = bt_peer_info(state->config, chunk->peer_list[0]);
-            // TODO: replace peer list with ids instead of addr            
-            // TODO: check if download in progress with given peer
-            if (chunk->pl_filled > 0) { 
-                data_packet_t pack;                                            
-                char *hash = id2hash(chunk->chunk_id,                          
-                    state->mcf_hashes, state->mcf_len);                        
-                pct_get(&pack, hash);                
-                // Choose peer
-                int peer = chunk->peer_list[0];    
-                chunk->peer = peer;                      
-                pct_send(&pack, peer_id_to_addr(peer, 
-                    state), state->sock);
-            }    
-            download->waiting_ihave = 0; // Stop waiting for IHAVE             
-       // }                                                               
-                                                                        
-    }                                                                   
+void check_download_status(server_state_t *state) {
+  if (dload_ihave_done(&state->download)) {
+    int chunk_indx = dload_pick_chunk(&state->download, state->peer_free);
+    if (chunk_indx >= 0) {
+      struct sockaddr_in *addr;
+      addr = peer_id_to_addr(state->download.chunks[chunk_indx].peer, state);
+      dload_chunk(&state->download, chunk_indx, addr, state->sock);
+    } else {
+    /* Could not start a new downloading meaning either
+     * 1) There are currently no free peers
+     * 2) All download slots are full
+     * 3) User specified a chunk file with no chunks
+     * 4) WHOHAS packets were lost to certain peers
+     * 
+     * The solution to issues 1, 3, and 4 is thus to resend WHOHAS and wait 
+     * (possibly until peers become free or download slots open).
+     */
+      // Send WHOHAS for chunks that we still don't have
+      // Reset WHOHAS timer
+    }                             
+  }                                                
 }
 
 void handle_user_input(char *line, void *cbdata) {
@@ -487,8 +475,41 @@ void handle_user_input(char *line, void *cbdata) {
   }
 }
 
+/* 
+ * get_largest_peer_id
+ * 
+ * Helper function which returns the largest peer id in the peers list.
+ */
+int get_largest_peer_id(bt_config_t *config) {
+  bt_peer_t *p = config->peers;
+  int largest = p->id;
+  for (p = p->next; p != NULL; p = p->next) {
+    largest = MAX(largest, p->id);
+  }
+  return largest;
+}
+
+/* 
+ * peer_free_init
+ * 
+ * Creates a sparse list of booleans to store whether user is currently 
+ * downloading a file from each peer (busy).  Free status is given by 1's and
+ * busy status is indicated by 0's.
+ */
+void peer_free_init(server_state_t *state) {
+  state->peer_free_size = get_largest_peer_id(state->config) + 1;
+  state->peer_free = malloc(sizeof(*state->peer_free) * state->peer_free_size);
+  memset(state->peer_free, 1, state->peer_free_size);
+}
+
+/*
+ * server_state_init
+ * 
+ *  */
 void server_state_init(server_state_t *state, bt_config_t *config, 
   int sock) {
+  
+  DPRINTF(DEBUG_INIT, "server_state_init: Initializing server state\n");
 
   memset(state, 0, sizeof(*state));
   state->config = config;
@@ -498,6 +519,9 @@ void server_state_init(server_state_t *state, bt_config_t *config,
     &state->mcf_hashes, &state->mcf_ids, &state->dataf);
   state->hcf_len = chunkf_parse(config->has_chunk_file,
     &state->hcf_hashes, &state->hcf_ids);
+  peer_free_init(state);
+
+  DPRINTF(DEBUG_INIT, "server_state_init: State initialied\n");
 }
 
 void peer_run(bt_config_t *config) {
@@ -540,7 +564,7 @@ void peer_run(bt_config_t *config) {
     FD_SET(STDIN_FILENO, &readfds);
     FD_SET(sock, &readfds);
 
-    dload_check_status(&state);
+    check_download_status(&state);
     
     nfds = select(sock+1, &readfds, NULL, NULL, &pct_timeout);
     

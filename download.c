@@ -82,6 +82,80 @@ void dload_start(download_t *download, char *hashes, int *ids,
 }
 
 /* 
+ * dload_ihave_done
+ * 
+ * Returns boolean for whether peer should stop waiting for IHAVE packets. 
+ */
+char dload_ihave_done(download_t *download) {                            
+  double time_passed = difftime(time(0), download->time_started); 
+  return (download->waiting_ihave && (time_passed > TIME_WAIT_IHAVE));
+}
+
+/* 
+ * dload_pick_peer
+ * 
+ * Given a specific index to the chunk array in 'download' struct, returns the
+ * index of a suitable peer to download the chunk from.  If no suitable peer is
+ * found, returns -1;
+ */
+char dload_pick_peer(download_t *download, char *peer_free, int indx) {
+  DPRINTF(DEBUG_DOWNLOAD, "download_pick_peer: Looking for suitable peer from which to download chunk\n");
+
+  // Iterate through peers for given chunk and check if each is free
+  for (int i = 0; i < download->chunks[indx].pl_filled; i++) {
+
+    int peer_id = download->chunks[indx].peer_list[indx];
+
+    if (peer_free[peer_id]) { // Found a free peer
+      return peer_id;
+    }
+
+  }
+
+  return -1;
+}
+
+/*
+ * dload_pick_chunk
+ *  
+ * Chooses the next chunk to download, sets the peer to download the chunk from,
+ * then returns the index of the chunk in the chunk array in the 'download' 
+ * struct. Returns -1 if no suitable chunk found.
+ * 
+ */
+char dload_pick_chunk(download_t *download, char *peer_free) {
+  DPRINTF(DEBUG_DOWNLOAD, "download_pick_chunk: Choosing next chunk to download\n");
+
+  // Create list of chunks from rarest to least rare
+  int rarest = dload_rarest_chunk(download);                     
+  chunkd_t *rarest_chunks = &download->chunks[rarest];
+
+  // Iterate through the list and try to find a chunk with at least one free peer
+  for (int i = 0; i < 1; i++) {
+
+    int peer_id = dload_pick_peer(download, peer_free, i);
+    if (peer_id > 0) { // Found a suitable peer
+      rarest_chunks[i].peer = peer_id;
+      return i;
+
+    }
+
+  }
+
+  return -1;
+}
+
+void dload_chunk(download_t *download, int indx, struct sockaddr_in *addr, 
+  int sock) {
+  DPRINTF(DEBUG_DOWNLOAD, "dload_chunk: Sending GET to initiate download process\n");
+
+  data_packet_t pack;                                                                   
+  pct_get(&pack, download->chunks[indx].hash);                
+  pct_send(&pack, addr, sock); 
+  download->waiting_ihave = 0; // Stop waiting for IHAVE   
+}
+
+/* 
  * can_download
  * 
  * Check that client has not already begun to download the given chunk. 

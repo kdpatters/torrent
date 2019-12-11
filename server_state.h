@@ -16,5 +16,9 @@ typedef struct server_state_s {
     char *hcf_hashes;
     int hcf_len;
 
+    // Peer info
+    char *peer_free; // Sparse array containing bools for whether each peer is free
+    int peer_free_size; // Size of 'peer_free' array
+
     int sock;
 } server_state_t;

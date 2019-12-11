@@ -1,5 +1,7 @@
 /*
  * packet.c
+ * 
+ * Packet creation, parsing, and sending
  */
 
 #include <string.h>
