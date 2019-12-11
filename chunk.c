@@ -75,14 +75,18 @@ int masterchunkf_parse(char *fname, char **hashes, int **ids, char **dataf) {
 
 	free(buf1);
 	free(buf2);
-	return helper_parse_chunkf(fp, hashes, ids); // Return # of chunks
+	int num_chunks = helper_parse_chunkf(fp, hashes, ids); // Return # of chunks
+	fclose(fp);
+	return num_chunks;
 }
 
 int chunkf_parse(char *fname, char **hashes, int **ids) {
 	DPRINTF(DEBUG_CHUNKS, "chunkf_parse: Parsing chunk file %s\n", fname);
 
 	FILE *fp = file_read_or_die(fname);
-	return helper_parse_chunkf(fp, hashes, ids); // Return # of chunks
+	int num_chunks = helper_parse_chunkf(fp, hashes, ids); // Return # of chunks
+	fclose(fp);
+	return num_chunks;
 }
 
 /*
@@ -94,12 +98,6 @@ int hash2id(char *hash, char *hashes, int *ids, int n_hashes) {
    DPRINTF(DEBUG_CHUNKS, "hash2id: Converting hash to id\n");
    for (int i = 0; i < n_hashes; i++) {
        char *arr_hash = &hashes[i * CHK_HASH_BYTES];
-//       char buf1[CHK_HASH_ASCII];
-//       char buf2[CHK_HASH_ASCII];
-//       hex2ascii((uint8_t *) hash, CHK_HASH_BYTES, buf1);
-//       hex2ascii((uint8_t *) arr_hash, CHK_HASH_BYTES, buf2);
-//       DPRINTF(DEBUG_CHUNKS, "hash2id: Comparing chunks\n%*s and\n%*s\n", 
-//           CHK_HASH_ASCII, buf1, CHK_HASH_ASCII, buf2);
        if (memcmp(hash, arr_hash, CHK_HASH_BYTES) == 0) {
            DPRINTF(DEBUG_CHUNKS, "hash2id: Successfully matched hash to id\n");
            return ids[i];
@@ -168,7 +166,13 @@ void shahash(uint8_t *str, int len, uint8_t *hash) {
 int verify_hash(uint8_t *str, int len, uint8_t *hash) {
   uint8_t gen_hash[SHA1_HASH_SIZE];
   shahash(str, len, gen_hash);
-  return !memcmp((char *) hash, (char *) &gen_hash, SHA1_HASH_SIZE);
+  char buf1[CHK_HASH_ASCII];
+  char buf2[CHK_HASH_ASCII];
+  hex2ascii((uint8_t *) hash, CHK_HASH_BYTES, buf1);
+  hex2ascii((uint8_t *) gen_hash, CHK_HASH_BYTES, buf2);
+  DPRINTF(DEBUG_CHUNKS, "hash2id: Comparing chunks\n%*s and\n%*s\n", 
+	CHK_HASH_ASCII, buf1, CHK_HASH_ASCII, buf2);
+  return !memcmp(hash, &gen_hash, SHA1_HASH_SIZE);
 }
 
 /**

@@ -16,10 +16,16 @@
 #include "input_buffer.h"
 
 
+// Test functions
+
+
+
 // Making packets after reading chunk
 void make_packets(upload_t *upl, char* buf, int buf_size) {
 
     int rem = buf_size % DATALEN;
+    DPRINTF(DEBUG_UPLOAD, "make_packets: Total data %d bytes\nMax packet size \
+%d bytes\nLast packet %d bytes\n", buf_size, DATALEN, rem);
     int listsize = buf_size / DATALEN + !!rem;
     data_packet_t *packs = malloc(sizeof(*packs) * listsize); // Array of packets to be created
     int offs = 0;
@@ -55,7 +61,8 @@ void read_chunk(upload_t *upl, char *filename, char *buf) {
         exit(1);
     }
     // Position pointer to where chunk located indicated by buf_size
-        fread(buf, BT_CHUNK_SIZE, 1, f); // Read a chunk
+    fread(buf, BT_CHUNK_SIZE, 1, f); // Read a chunk
+    fclose(f);
 }
 
 // Check if ack receieved is a duplicate that was rec before for another packet
@@ -86,6 +93,15 @@ void check_retry_upl(upload_t *upl, int seq, server_state_t *state, struct socka
         DPRINTF(DEBUG_UPLOAD, "check_retry_upl: Sending next packet %d\n", seq + ACK_WINDOW_SZ);
     }
 
+}
+
+// Clear memory after upload is downloaded by the peer
+clear_mem(upload_t upl, server_state_t *state) {
+    //if(new_func) {}
+    data_packet_t packs = upl->chunk.packetlist;
+    int acks_count = upl->recv;
+    free(packs); // Free packetlist & acks count arr from upl struct after chunk downloaded
+    free(acks_count);
 }
 
 /* 

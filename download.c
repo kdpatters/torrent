@@ -10,9 +10,9 @@
 #include <time.h>
 #include "bt_parse.h"
 #include "chunk.h"
+#include "packet.h"
 #include "download.h"
 #include "debug.h"
-#include "packet.h"
 
 #define INVALID_FIELD 0
 
@@ -60,7 +60,7 @@ char dload_peer_add(download_t *download, int peer_id, int chunk_id) {
 
 /* Start the download process as a result of the GET command. */
 void dload_start(download_t *download, char *hashes, int *ids, 
-  int n_hashes) {
+  int n_hashes, char *outputf) {
   DPRINTF(DEBUG_INIT, "dload_start: Initializing download\n");
   
   // Start the download timer
@@ -77,6 +77,7 @@ void dload_start(download_t *download, char *hashes, int *ids,
     chk->state = WAIT_IHAVE;
   }
   download->n_chunks = n_hashes;
+  strncpy(download->output_file, outputf, MAX_FILENAME);
   DPRINTF(DEBUG_INIT, "dload_start: Done\n");
 }
 

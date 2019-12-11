@@ -39,7 +39,7 @@ non-positive length %d.\n", packet_len);
     header->magicnum = MAGICNUM;
     header->version = VERSIONNUM;
     header->packet_type = pack_type;
-    header->header_len = sizeof(header);
+    header->header_len = sizeof(*header);
     header->packet_len = packet_len;
     header->seq_num = seq_num;
     header->ack_num = ack_num;
