@@ -365,7 +365,7 @@ so far for this chunk\n",
 
   // Send ACK response
   data_packet_t new_packet;
-  pct_ack(&new_packet, pct.header.seq_num);
+  pct_ack(&new_packet, dload_cumul_ack(chk));
   pct_send(&new_packet, &from, state->sock);
 
   download_do_complete(state, chk);

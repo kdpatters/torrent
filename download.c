@@ -40,9 +40,12 @@ void write_chunk(int id, char *fname, char *buf) {
  */
 int dload_cumul_ack(chunkd_t *chk) {
     for (int i = 0; i < chk->pieces_size; i++) {
-        if (chk->pieces_filled[i] == 0) {
+        /* 'pieces_filled' set to 1 only if we have received a
+         * data packet with a sequence number of that index. */
+        if (chk->pieces_filled[i] == 0) // Missing packet in sequence
             return i - 1;
-        }
+        else if (i == (chk->pieces_size - 1)) // Every element is a 1
+            return i;
     }
     fprintf(stderr, "Cannot create ACK.  No pieces have been stored yet for this chunk\n");
     exit(1);
@@ -86,7 +89,6 @@ void dload_store_data(chunkd_t *chk, data_packet_t pct) {
       sizeof(*chk->pieces_filled) * chk->pieces_size);
     memset(&chk->pieces_filled[old_size], 0, sizeof(*chk->pieces_filled) * 
       (new_size - old_size));
-    fprintf(stderr, "filled: %d\n", chk->pieces_filled[old_size]);
   }
   // Insert the data into the pieces array if slot is not already filled
   DPRINTF(DEBUG_DOWNLOAD, "dload_store_data: Copying packet data into chunk info in download struct\n");
