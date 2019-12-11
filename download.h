@@ -57,6 +57,8 @@ typedef struct download_s {
   int initd; // Boolen for whether download has been initialized
   time_t time_started;
   int waiting_ihave;
+  int n_ihave_waiting; // Number of IHAVE responses waiting for
+  int n_ihave_recv; // Number of IHAVE responses received
 
   // Chunk info
   int n_chunks;
@@ -70,7 +72,7 @@ void dload_chunk(download_t *download, int indx, struct sockaddr_in *addr, int s
 char dload_pick_chunk(download_t *download, char *peer_free);
 char dload_ihave_done(download_t *download);
 char dload_peer_add(download_t *download, int peer_id, int chunk_id);
-void dload_start(download_t *, char *, int *, int, char *);
+void dload_start(download_t *, char *, int *, int, char *, int);
 char dload_complete(chunkd_t *chk);
 void dload_store_data(chunkd_t *chk, data_packet_t pct);
 void dload_assemble_chunk(chunkd_t *chk);

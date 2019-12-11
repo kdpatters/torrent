@@ -56,20 +56,6 @@ int main(int argc, char **argv) {
   return 0;
 }
 
-/*
- * id_in_ids
- *
- * Returns a boolean for whether a given integer `id` is in an array
- * of integers `ids` of length `ids_len`.
- */
-int id_in_ids(int id, int *ids, int ids_len) {
-  for (int i = 0; i < ids_len; i++) {
-    if (id == ids[i])
-      return 1;
-  }
-  return 0;  
-}
-
 /* Returns the id for a peer based on its IP address and port. */
 int peer_addr_to_id(struct sockaddr_in peer, server_state_t *state) {
   DPRINTF(DEBUG_ALL, "peer_addr_to_id: Started\n");
@@ -166,8 +152,11 @@ void cmd_get(char *chunkf, char *outputf, server_state_t *state) {
   // Flood the network
   flood_peers(packet_list, n_packets, state);
 
+  // Number of IHAVE responses we are waiting for
+  int n_ihave = n_packets * (state->n_peers - 1);
+
   // Start the download process
-  dload_start(&state->download, hashes, ids, n_hashes, outputf);
+  dload_start(&state->download, hashes, ids, n_hashes, outputf, n_ihave);
   blank_file(outputf, state->mcf_len);
 
   free(hashes);
@@ -511,6 +500,15 @@ int get_largest_peer_id(bt_config_t *config) {
   return largest;
 }
 
+/* Returns the number of peers in the network. */
+int get_n_peers(bt_config_t *config) {
+  bt_peer_t *p = config->peers;
+  int n = 0;
+  for (p = p->next; p != NULL; p = p->next)
+    n++;
+  return n;
+}
+    
 /* 
  * peer_free_init
  * 
@@ -542,6 +540,7 @@ void server_state_init(server_state_t *state, bt_config_t *config,
   state->hcf_len = chunkf_parse(config->has_chunk_file,
     &state->hcf_hashes, &state->hcf_ids);
   peer_free_init(state);
+  state->n_peers = get_n_peers(config);
 
   DPRINTF(DEBUG_INIT, "server_state_init: State initialied\n");
 }

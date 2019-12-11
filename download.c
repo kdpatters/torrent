@@ -165,7 +165,9 @@ char dload_peer_add(download_t *download, int peer_id, int chunk_id) {
       chunkd_t *chk = &download->chunks[i];                                
                                                                            
       // Check if we found the IHAVE chunk in the requested chunks
-      if (chk->chunk_id == chunk_id) {                                     
+      // Only add peer to chunk info if it hasn't been added already
+      if ((chk->chunk_id == chunk_id)  && // Chunk id matches
+         !(id_in_ids(peer_id, chk->peer_list, chk->pl_filled))) {                                     
       DPRINTF(DEBUG_DOWNLOAD, "dload_peer_add: Matched IHAVE chunk %d in chunks requested to download, adding peer %d\n", chunk_id, peer_id);         
                                                                            
         // Resize the peer list if necessary                               
@@ -223,7 +225,7 @@ void dload_clear(download_t *download) {
 
 /* Start the download process as a result of the GET command. */
 void dload_start(download_t *download, char *hashes, int *ids, 
-  int n_hashes, char *outputf) {
+  int n_hashes, char *outputf, int n_ihave) {
 
   DPRINTF(DEBUG_DOWNLOAD, "dload_start: Initializing download\n");
   dload_clear(download); // Clear bits if already initialized
@@ -231,6 +233,7 @@ void dload_start(download_t *download, char *hashes, int *ids,
   // Start the download timer
   download->time_started = time(0);
   download->waiting_ihave = 1;
+  download->n_ihave_waiting = n_ihave;
 
   int chks_size = sizeof(*download->chunks) * n_hashes;  
   download->chunks = malloc(chks_size);
