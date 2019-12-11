@@ -485,29 +485,6 @@ void handle_user_input(char *line, void *cbdata) {
     }
   }
 }
-
-/* 
- * get_largest_peer_id
- * 
- * Helper function which returns the largest peer id in the peers list.
- */
-int get_largest_peer_id(bt_config_t *config) {
-  bt_peer_t *p = config->peers;
-  int largest = p->id;
-  for (p = p->next; p != NULL; p = p->next) {
-    largest = MAX(largest, p->id);
-  }
-  return largest;
-}
-
-/* Returns the number of peers in the network. */
-int get_n_peers(bt_config_t *config) {
-  bt_peer_t *p = config->peers;
-  int n = 0;
-  for (p = p->next; p != NULL; p = p->next)
-    n++;
-  return n;
-}
     
 /* 
  * peer_free_init

@@ -170,7 +170,10 @@ char dload_peer_add(download_t *download, int peer_id, int chunk_id) {
          !(id_in_ids(peer_id, chk->peer_list, chk->pl_filled))) {                                     
       DPRINTF(DEBUG_DOWNLOAD, "dload_peer_add: Matched IHAVE chunk %d in chunks requested to download, adding peer %d\n", chunk_id, peer_id);         
                                                                            
-        // Resize the peer list if necessary                               
+       // Increment counter for number of IHAVE responses received
+       download->n_ihave_recv++; 
+
+       // Resize the peer list if necessary                               
         if (chk->pl_size <= chk->pl_filled) {                              
           chk->pl_size = chk->pl_size ? chk->pl_size * 2 : 1;                         
           chk->peer_list = realloc(chk->peer_list,                         
