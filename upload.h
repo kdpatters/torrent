@@ -12,11 +12,12 @@
 #define T_OUT_DATA (MS_TO_S * 5) // 10 ms
 #define T_OUT_ACK (MS_TO_S * 5) // 10 ms
 #define MAX_RET_SEND_DATA 3
-#define MAX_RET_REC_DATA 3
+#define MAX_DUP_ACK 3
 #define SEQ_NUMB 0
 #define ACK_NUMB 0
 #define NOT_BUSY 0
 #define BUSY 1
+#define ACK_WINDOW_SZ 8 
 
  
 typedef struct chunku_s {
@@ -46,3 +47,5 @@ typedef struct chunku_s {
 
 void make_packets(upload_t *upl, char* buf, int buf_size);
 void read_chunk(upload_t *upl, char *filename, char *buf);
+void check_retry_upl(upload_t *upl, int seq, server_state_t *state, struct sockaddr_in *dest);
+char check_dup_ack(upload_t *upl, int sequence, data_packet_t *ack);

@@ -243,8 +243,12 @@ void process_get(server_state_t *state, data_packet_t pct, struct sockaddr_in fr
       upl->chunk.chunk_id = id;
       read_chunk(upl, state->dataf, buf); // Reads chunk from Data file in Master chunkfile
       make_packets(upl, buf, buf_size); // Split chunk into packets
-      upl->busy = BUSY; // Change upload status 
-      pct_send(&upl->chunk.packetlist[0], &from, state->sock);  // Send first packet
+      upl->busy = BUSY; // Change upload status
+
+      for(int i = 0; i < ACK_WINDOW_SZ; i++) {
+        pct_send(&upl->chunk.packetlist[i], &from, state->sock);  // Send first 8 packets
+
+      } 
     }
 
     else { // Otherwise send DENIED back
@@ -301,19 +305,20 @@ void process_ack(server_state_t *state, data_packet_t ack, struct sockaddr_in fr
   }
   DPRINTF(DEBUG_UPLOAD, "process_ack: Reading info about upload %d\n", ind);
   upload_t *up = &state->uploads[ind];
-  up.recv[ack.header.ack_num] = 1; // 1 - index into rec using ack_num to indicate ack for that packet received
+  up->recv[ack.header.ack_num] += 1; // 1 - index into rec using ack_num to indicate ack for that packet received
   // Store ACK in uploads struct
-  // TODO
 
   // Send the next data packet
   DPRINTF(DEBUG_UPLOAD, "process_ack: Currently, %d of %d packets sent\n",
     up->seq_num, up->chunk.l_size);
+    
   if (up->seq_num < up->chunk.l_size - 1) {
       struct sockaddr_in *peer_addr = peer_id_to_addr(up->peer_id, state); 
       // Update uploads struct sequence number
       pct_send(&up->chunk.packetlist[++up->seq_num], peer_addr, state->sock);
   }
   DPRINTF(DEBUG_UPLOAD, "process_ack: Upload to peer %d completed\n", ind);
+  
 }
 
 void process_denied(server_state_t *state, data_packet_t pct, struct sockaddr_in from) {
@@ -461,6 +466,7 @@ void peer_run(bt_config_t *config) {
     FD_SET(sock, &readfds);
 
     dload_check_status(&state);
+    //check_retry_upl();
     
     nfds = select(sock+1, &readfds, NULL, NULL, &pct_timeout);
     

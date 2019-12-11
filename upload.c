@@ -12,6 +12,7 @@
 #include "bt_parse.h"
 #include "upload.h"
 #include "download.h"
+#include "debug.h"
 #include "input_buffer.h"
 
 
@@ -57,44 +58,44 @@ void read_chunk(upload_t *upl, char *filename, char *buf) {
         fread(buf, BT_CHUNK_SIZE, 1, f); // Read a chunk
 }
 
-/* 
-char check_upload_peer(upload_t *upl, bt_config_t *cfg) {
-    bt_peer_t *p;
-    for (p = cfg->peers; p != NULL; p = p->next) {  // Iterate through peers
-
-        if (p->id != upl->chunk->peer_id) { 
-            continue;
-        }
-        else {
-            return 1;
-        }
-    }
-    return -1;
-}
-
-*/
-
-
 // Check if ack receieved is a duplicate that was rec before for another packet
-char check_dup_ack(upload_t *upl, int sequence, data_packet *ack) {
+char check_dup_ack(upload_t *upl, int sequence, data_packet_t *ack) {
     int n_acks = upl->rec[sequence];
-    if(n_acks > 0)  // If current ack was already received before
-        n_acks++; // It is a duplicate
+    if(n_acks == MAX_DUP_ACK + 1)  // If current ack was already received before
+        return 1;; // It is a duplicate
     
-    return n_acks; // Otherwise not a dup
+    return -1; // Otherwise not a dup
 }
+
  
 // Check when the last data packet was received
-void check_retry_upl(upload_t *upl, int seq, struct sockaddr_in *dest, bt_config_t *co) {
+void check_retry_upl(upload_t *upl, int seq, server_state_t *state, struct sockaddr_in *dest) {
 
-    clock_t curr_time;
-    curr_time = clock();
-    clock_t last_ack = upl->last_ack_rec;
-    
-    if(((curr_time - last_ack) > T_OUT_ACK) || (check_dup_ack(upl, seq) == 4) { // Time-out occurs or dup ack rec 3 times, incrementing 2 - 3 - 4
-        pct_send(upl, seq, dest, co); // in recv array 
+    double tdiff_last_ack = difftime(time(0), upl->last_ack_rec); 
 
+    // Time-out occurs, or dup ack rec 3 times, incrementing recv array int from 2 -> 3 -> 4
+    if(((tdiff_last_ack > T_OUT_ACK) || check_dup_ack(upl, seq)) { 
+        data_packet_t resend_pac = upl->chunk.packetlist[seq];
+        pct_send(resend_pac, dest, state->sock); // in recv array 
+        DPRINTF(DEBUG_UPLOAD, "check_retry_upl: Re-sending lost packet %d\n", seq);
+    }
+    // Ack never seen before
+    else if(!check_dup_ack) {
+        data_packet_t send_next = upl->chunk.packetlist[seq + ACK_WINDOW_SZ]; // Get the next packet to send
+        pct_send(send_next, dest, state->sock); // Send the next data packet if ack rec is not seen before
+        DPRINTF(DEBUG_UPLOAD, "check_retry_upl: Sending next packet %d\n", seq + ACK_WINDOW_SZ);
     }
 
 }
 
+/* 
+    if (ack number is not yet seen)
+        send data[ack number + window size]
+
+    // inside of function called by process get to send first series of data packets
+    for (data packet from 0 to window size)
+        send data packet
+
+
+        DPRINTF(DEBUG_UPLOADS, "Msg %d\n", int);
+*/
