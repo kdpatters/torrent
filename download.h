@@ -69,3 +69,7 @@ char dload_pick_chunk(download_t *download, char *peer_free);
 char dload_ihave_done(download_t *download);
 char dload_peer_add(download_t *download, int peer_id, int chunk_id);
 void dload_start(download_t *, char *, int *, int, char *);
+char dload_complete(chunkd_t *chk);
+void dload_store_data(chunkd_t *chk, data_packet_t pct);
+void dload_assemble_chunk(chunkd_t *chk);
+char dload_verify_and_write_chunk(chunkd_t *chk, char *fname);

@@ -16,6 +16,76 @@
 
 #define INVALID_FIELD 0
 
+// Returns true if chukn is verified and written to disk correctly.
+char dload_verify_and_write_chunk(chunkd_t *chk, char *fname) {
+  if (verify_hash((uint8_t *) chk->data, chk->total_bytes, (uint8_t *) chk->hash)) {
+      DPRINTF(DEBUG_DOWNLOAD, 
+        "dload_verify_and_write_chunk: Chunk %d successfully downloaded!\n", 
+        chk->chunk_id);
+
+      // Write the chunk to disk
+      FILE *f = fopen(fname, "w+");
+      if (f == NULL) {
+        fprintf(stderr, "Could not open output file %s\n", fname);
+        exit(1);
+      }
+      fwrite(chk->data, chk->total_bytes, 1, f);
+      fclose(f);
+      return 0;
+  }
+  return 1;
+}
+
+void dload_assemble_chunk(chunkd_t *chk) {
+  // Assemble pieces
+  void *data_ptr = chk->data;
+  for (int j = 0; j < chk->pieces_size; j++) {
+    if (chk->pieces_filled[j]) {
+      data_packet_t *dat = &chk->pieces[j];
+      int n_bytes = dat->header.packet_len - dat->header.header_len;
+      memcpy(data_ptr, dat->data, n_bytes);
+      data_ptr += n_bytes;
+    }
+  }
+}
+
+void dload_store_data(chunkd_t *chk, data_packet_t pct) {
+  // Check if it is necessary to resize pieces array
+  int seq_num = pct.header.seq_num;
+  if (chk->pieces_size <= seq_num) {
+    DPRINTF(DEBUG_DOWNLOAD, "dload_store_data: Chunk packet array is too small, allocating more memory\n");
+    int old_size = chk->pieces_size;
+    int new_size = (1 + seq_num) * 2;
+    chk->pieces_size = new_size;
+    chk->pieces = realloc(chk->pieces, sizeof(*chk->pieces) * chk->pieces_size);
+    chk->pieces_filled = realloc(chk->pieces_filled, 
+      sizeof(*chk->pieces_filled) * chk->pieces_size);
+    memset(&chk->pieces_filled[old_size], 0, sizeof(*chk->pieces_filled) * 
+      (new_size - old_size));
+    fprintf(stderr, "filled: %d\n", chk->pieces_filled[old_size]);
+  }
+  // Insert the data into the pieces array if slot is not already filled
+  DPRINTF(DEBUG_DOWNLOAD, "dload_store_data: Copying packet data into chunk info in download struct\n");
+  if (!chk->pieces_filled[seq_num]) {
+    memcpy(&chk->pieces[seq_num], &pct, sizeof(pct));
+    chk->pieces_filled[seq_num] = 1;
+    DPRINTF(DEBUG_DOWNLOAD, "dload_store_data: Packet contains payload of %d bytes\n", pct.header.packet_len - pct.header.header_len);
+    chk->total_bytes += pct.header.packet_len - pct.header.header_len;
+  }
+  else {
+    DPRINTF(DEBUG_DOWNLOAD, "dload_store_data: Received duplicate of packet \
+sequence no. %d\n", seq_num);
+    exit(0);
+  }
+
+  // Store information about last_data_recv
+  chk->last_data_recv = time(0);
+}
+
+char dload_complete(chunkd_t *chk) {
+  return (chk->total_bytes >= BT_CHUNK_SIZE);
+}
+
 int dload_rarest_chunk(download_t *download) {
     // Find the rarest chunk
     int n_peers = download->chunks[0].pl_filled;
