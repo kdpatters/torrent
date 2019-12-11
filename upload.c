@@ -29,7 +29,7 @@ void make_packets(upload_t *upl, char* buf, int buf_size) {
         // Divide into packets
         for (int i = 0; i < listsize; i++) {
             char* mem_curr = buf + offs; 
-            pct_data(&packs[i], i, mem_curr,
+            pct_data(&packs[i], i + 1, mem_curr,
                 (i == (listsize - 1)) ? rem : DATALEN);         
             offs += DATALEN;
         }

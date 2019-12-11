@@ -43,9 +43,9 @@ int dload_cumul_ack(chunkd_t *chk) {
         /* 'pieces_filled' set to 1 only if we have received a
          * data packet with a sequence number of that index. */
         if (chk->pieces_filled[i] == 0) // Missing packet in sequence
-            return i - 1;
-        else if (i == (chk->pieces_size - 1)) // Every element is a 1
             return i;
+        else if (i == (chk->pieces_size - 1)) // Every element is a 1
+            return i + 1;
     }
     fprintf(stderr, "Cannot create ACK.  No pieces have been stored yet for this chunk\n");
     exit(1);
@@ -78,7 +78,7 @@ void dload_assemble_chunk(chunkd_t *chk) {
 
 void dload_store_data(chunkd_t *chk, data_packet_t pct) {
   // Check if it is necessary to resize pieces array
-  int seq_num = pct.header.seq_num;
+  int seq_num = pct.header.seq_num - 1;
   if (chk->pieces_size <= seq_num) {
     DPRINTF(DEBUG_DOWNLOAD, "dload_store_data: Chunk packet array is too small, allocating more memory\n");
     int old_size = chk->pieces_size;
