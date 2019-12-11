@@ -43,9 +43,11 @@ typedef struct chunku_s {
     clock_t t_start_send;
     int *recv; // To keep count of packets sent for upload and recv
     int busy; // Busy -- 1, Not busy - 0  
+    int next_pack_ind;
 } upload_t;
 
 void make_packets(upload_t *upl, char* buf, int buf_size);
 void read_chunk(upload_t *upl, char *filename, char *buf);
 void check_retry_upl(upload_t *upl, int seq, server_state_t *state, struct sockaddr_in *dest);
 char check_dup_ack(upload_t *upl, int sequence, data_packet_t *ack);
+void clear_mem(server_state_t *state, struct sockaddr_in from);

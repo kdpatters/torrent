@@ -1,14 +1,34 @@
 /*
  * packet.c
+ * 
+ * Packet creation, parsing, and sending
  */
 
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <sys/param.h>
 #include "packet.h"
 #include "bt_parse.h"
 #include "chunk.h"
 #include "debug.h"
+ 
+/*
+ * pct_standardize
+ *
+ * Modifies a packet in place to convert it to normal header and data
+ * offsets.
+ */
+void pct_standardize(data_packet_t *pct) {
+    // Check if modification is necessary
+    int header_len = pct->header.header_len;
+    int header_excess = header_len - sizeof(pct->header);
+    int payload_len = MIN(sizeof(*pct), pct->header.packet_len) - header_len;
+    if (header_excess <= 0)
+        return;
+    pct->header.header_len -= header_excess;
+    memmove(pct->data, pct->data + header_excess, payload_len);
+}
 
 /*
  * pct_init

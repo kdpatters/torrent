@@ -23,6 +23,7 @@
 #include "download.h"
 #include "server_state.h"
 #include "test_peer.h"
+#include "peer_list.h"
 
 #define PCT_TIMEOUT 500000
 
@@ -55,20 +56,6 @@ int main(int argc, char **argv) {
   return 0;
 }
 
-/*
- * id_in_ids
- *
- * Returns a boolean for whether a given integer `id` is in an array
- * of integers `ids` of length `ids_len`.
- */
-int id_in_ids(int id, int *ids, int ids_len) {
-  for (int i = 0; i < ids_len; i++) {
-    if (id == ids[i])
-      return 1;
-  }
-  return 0;  
-}
-
 /* Returns the id for a peer based on its IP address and port. */
 int peer_addr_to_id(struct sockaddr_in peer, server_state_t *state) {
   DPRINTF(DEBUG_ALL, "peer_addr_to_id: Started\n");
@@ -84,7 +71,7 @@ int peer_addr_to_id(struct sockaddr_in peer, server_state_t *state) {
 }
 
 struct sockaddr_in *peer_id_to_addr(int peer_id, server_state_t *state) {
-  DPRINTF(DEBUG_ALL, "peer_id_to_add: Started\n");
+  DPRINTF(DEBUG_ALL, "peer_id_to_addr: Started\n");
   for (bt_peer_t *p = state->config->peers; p != NULL; p = p->next) {
     if (p->id == peer_id) {
       return &p->addr;
@@ -136,6 +123,19 @@ int hashes2packets(data_packet_t **packet_list, char *hashes,
   return list_size;
 }
 
+void blank_file(char *fname, int n_chunks) {
+  FILE *f = fopen(fname, "w");
+  if (f == NULL) {
+    fprintf(stderr, "Problem opening file %s\n", fname);
+    exit(1);
+  }
+  char buf[BT_CHUNK_SIZE];
+  memset(buf, 0, sizeof(buf));
+  for (int i = 0; i < n_chunks; i++) {
+    fwrite(buf, sizeof(buf), 1, f);
+  }
+}
+
 // Executes a user specified "GET <chunk list> <output file>" command
 void cmd_get(char *chunkf, char *outputf, server_state_t *state) {
   DPRINTF(DEBUG_COMMANDS, "cmd_get: Executing get command\n");
@@ -152,8 +152,12 @@ void cmd_get(char *chunkf, char *outputf, server_state_t *state) {
   // Flood the network
   flood_peers(packet_list, n_packets, state);
 
+  // Number of IHAVE responses we are waiting for
+  int n_ihave = n_packets * (state->n_peers - 1);
+
   // Start the download process
-  dload_start(&state->download, hashes, ids, n_hashes, outputf);
+  dload_start(&state->download, hashes, ids, n_hashes, outputf, n_ihave);
+  blank_file(outputf, state->mcf_len);
 
   free(hashes);
   free(ids);
@@ -208,6 +212,9 @@ void process_whohas(server_state_t *state, data_packet_t pct, struct sockaddr_in
 
 void process_ihave(server_state_t *state, data_packet_t pct, struct sockaddr_in from) {
   char n = get_n_hashes(pct);
+                                                                       
+  /* Increment counter for number of IHAVE responses received. */
+  state->download.n_ihave_recv++; 
 
   // Parse the hashes from the packet
   for (int i = 0; i < n; i++) {
@@ -241,7 +248,7 @@ void process_get(server_state_t *state, data_packet_t pct, struct sockaddr_in fr
       upl = &state->uploads[up_emp];
       upl->peer_id = peer_addr_to_id(from, state);
       upl->chunk.chunk_id = id;
-      read_chunk(upl, state->dataf, buf); // Reads chunk from Data file in Master chunkfile
+      read_chunk(upl->chunk.chunk_id, state->dataf, buf); // Reads chunk from Data file in Master chunkfile
       make_packets(upl, buf, buf_size); // Split chunk into packets
       upl->busy = BUSY; // Change upload status
 
@@ -261,103 +268,105 @@ void process_get(server_state_t *state, data_packet_t pct, struct sockaddr_in fr
     }
 }
 
-void process_data(server_state_t *state, data_packet_t pct, struct sockaddr_in from) {
- 
+/* 
+ * find_relevant_download
+ * 
+ * Attempts to find the chunk download relevant to the source of the data packet
+ * received.  Returns a pointer to the chunk if found and NULL otherwise. 
+ */
+chunkd_t *find_relevant_download(server_state_t *state, struct sockaddr_in from) {
   int peer_id = peer_addr_to_id(from, state); // Get sender's peer id
 
-  chunkd_t *chunks = state->download.chunks;
-  int n = state->download.n_chunks;
-  for (int i = 0; i < n; i++) {
+  for (int i = 0; i < state->download.n_chunks; i++) {
     // Look for the relevant chunk
-    chunkd_t *chk = &chunks[i];
+    chunkd_t *chk = &state->download.chunks[i];
     if (chk->peer == peer_id) {
-    DPRINTF(DEBUG_DOWNLOAD, "process_data: Received DATA from peer %d for chunk %d\n" , 
-      peer_id, i);
-    DPRINTF(DEBUG_DOWNLOAD, "process_data: Have received total of %d / %d bytes so far\n",
-      chk->total_bytes, BT_CHUNK_SIZE);
- 
-      // Check if it is necessary to resize pieces array
-      int seq_num = pct.header.seq_num;
-      if (chk->pieces_size <= seq_num) {
-        DPRINTF(DEBUG_DOWNLOAD, "process_data: Chunk packet array is too small, allocating more memory\n");
-        int old_size = chk->pieces_size;
-        int new_size = (1 + seq_num) * 2;
-        chk->pieces_size = new_size;
-        chk->pieces = realloc(chk->pieces, sizeof(*chk->pieces) * chk->pieces_size);
-        chk->pieces_filled = realloc(chk->pieces_filled, 
-          sizeof(*chk->pieces_filled) * chk->pieces_size);
-        memset(&chk->pieces_filled[old_size], 0, sizeof(*chk->pieces_filled) * 
-          (new_size - old_size));
-        fprintf(stderr, "filled: %d\n", chk->pieces_filled[old_size]);
-      }
-      // Insert the data into the pieces array if slot is not already filled
-      DPRINTF(DEBUG_DOWNLOAD, "process_data: Copying packet data into chunk info in download struct\n");
-      if (!chk->pieces_filled[seq_num]) {
-        memcpy(&chk->pieces[seq_num], &pct, sizeof(pct));
-        chk->pieces_filled[seq_num] = 1;
-        DPRINTF(DEBUG_DOWNLOAD, "process_data: Packet contains payload of %d bytes\n", pct.header.packet_len - pct.header.header_len);
-        chk->total_bytes += pct.header.packet_len - pct.header.header_len;
-      }
-      else {
-        DPRINTF(DEBUG_DOWNLOAD, "process_data: Received duplicate of packet \
-sequence no. %d\n", seq_num);
-        exit(0);
-      }
-
-      // Store information about last_data_recv
-      chk->last_data_recv = time(0);
-
-      // Send ACK response
-      data_packet_t new_packet;
-      pct_ack(&new_packet, seq_num);
-      pct_send(&new_packet, &from, state->sock);
-
-      // Check if download is complete, if so verify chunk then write to disk
-      if (chk->total_bytes >= BT_CHUNK_SIZE) {
-        DPRINTF(DEBUG_DOWNLOAD, "process_data: Combining pieces of chunk\n");
-
-        // Assemble pieces
-        void *data_ptr = chk->data;
-        for (int j = 0; j < chk->pieces_size; j++) {
-          if (chk->pieces_filled[j]) {
-            data_packet_t *dat = &chk->pieces[j];
-            int n_bytes = dat->header.packet_len - dat->header.header_len;
-            memcpy(data_ptr, dat->data, n_bytes);
-            data_ptr += n_bytes;
-          }
-        }
-
-        DPRINTF(DEBUG_DOWNLOAD, "process_data: Verifying the chunk\n");
-        // Verify the chunk
-        if (verify_hash((uint8_t *) chk->data, chk->total_bytes, (uint8_t *) chk->hash)) {
-          DPRINTF(DEBUG_DOWNLOAD, 
-            "process_data: Chunk %d successfully downloaded!\n", chk->chunk_id);
-          // Write the chunk to disk
-          char *fname = state->download.output_file;
-          FILE *f = fopen(fname, "w+");
-          if (f == NULL) {
-            fprintf(stderr, "Could not open output file %s\n", fname);
-            exit(1);
-          }
-          fwrite(chk->data, chk->total_bytes, 1, f);
-          fclose(f);
-        } else {
-          DPRINTF(DEBUG_DOWNLOAD, "Chunk could not be verified, redownloading\n");
-          // Redownload chunk
-          // chk->pieces_filled = 0;
-          // data_packet_t pack;                                                                    
-          // pct_get(&pack, chk->hash);                          
-          // pct_send(&pack, peer_id_to_addr(chunk->peer, 
-          //     state), state->sock);
-          // break;
-        }
-
-        // Empty the pieces
-        free(chk->pieces);
-        free(chk->pieces_filled);
-      }
-     }
+      return chk;
+    }
   }
+  return NULL;
+}
+
+void redownload_chk(server_state_t *state, chunkd_t *chk) {
+  DPRINTF(DEBUG_DOWNLOAD, "Chunk could not be verified, redownloading\n");
+  // Redownload chunk
+  chk->pieces_filled = 0;
+  data_packet_t pack;                                                                    
+  pct_get(&pack, chk->hash);                          
+  pct_send(&pack, peer_id_to_addr(chk->peer, 
+      state), state->sock);
+}
+
+void finish_file(server_state_t *state, char *fname) {
+  int *ids = state->hcf_ids;
+  int n = state->hcf_len;
+  char *dataf = state->dataf;
+
+  for (int i = 0; i < n; i++) {
+    char buf[BT_CHUNK_SIZE];
+    int id = ids[i];
+    read_chunk(id, dataf, buf);
+    write_chunk(id, fname, buf);
+  }
+
+}
+
+/* Check if download of chunk is complete, and if so execute various actions. */
+void download_do_complete(server_state_t *state, chunkd_t *chk) {
+  // Check if download is complete, if so verify chunk then write to disk
+  if (dload_complete(chk)) {
+    DPRINTF(DEBUG_DOWNLOAD, "download_do_complete: Combining pieces of chunk\n");
+    dload_assemble_chunk(chk);
+
+    DPRINTF(DEBUG_DOWNLOAD, "download_do_complete: Verifying the chunk\n");
+    // Verify and write the chunk to disk
+    char *fname = state->download.output_file; 
+    if (dload_verify_and_write_chunk(chk, fname)) 
+      redownload_chk(state, chk);
+
+    chk->state = COMPLETE;
+    state->peer_free[chk->peer] = PEER_FREE; // Mark peer as free
+
+    // Start the download of the next chunk
+    int chunk_indx = dload_pick_chunk(&state->download, state->peer_free);
+    if (chunk_indx >= 0) {
+      struct sockaddr_in *addr;
+      addr = peer_id_to_addr(state->download.chunks[chunk_indx].peer, state);
+      dload_chunk(&state->download, chunk_indx, addr, state->sock, state->peer_free);
+    } else { // Check if every chunk has been downloaded
+      int n_chunks = state->download.n_chunks;
+      int n_complete = 0;
+      for (int i = 0; i < n_chunks; i++)
+        n_complete += (state->download.chunks[i].state == COMPLETE);
+      DPRINTF(DEBUG_DOWNLOAD, "download_do_complete: %d / %d chunks are complete so far\n", n_complete, n_chunks);
+      if (n_complete == n_chunks) // If download is completely done, finish file
+        DPRINTF(DEBUG_DOWNLOAD, "All chunks have been downloaded...finishing file\n");
+        finish_file(state, state->download.output_file);
+    }
+  }
+}
+
+void process_data(server_state_t *state, data_packet_t pct, struct sockaddr_in from) {
+  chunkd_t *chk = find_relevant_download(state, from);
+  if (chk == NULL) {
+    DPRINTF(DEBUG_DOWNLOAD, "process_data: Could not find relevant download, ignoring DATA packet\n");
+    return;
+  }
+
+  DPRINTF(DEBUG_DOWNLOAD, "process_data: Received DATA from peer %d\n" , 
+    chk->peer);
+  DPRINTF(DEBUG_DOWNLOAD, "process_data: Have received total of %d / %d bytes \
+so far for this chunk\n",
+    chk->total_bytes, BT_CHUNK_SIZE);
+
+  dload_store_data(chk, pct);
+
+  // Send ACK response
+  data_packet_t new_packet;
+  pct_ack(&new_packet, dload_cumul_ack(chk));
+  pct_send(&new_packet, &from, state->sock);
+
+  download_do_complete(state, chk);
 }
    
 /*
@@ -409,12 +418,14 @@ void process_inbound_udp(int sock, server_state_t *state) {
   struct sockaddr_in from;
   socklen_t fromlen;
   char buf[PACKETLEN];
-
+  memset(buf, 0, sizeof(buf));
+    
   fromlen = sizeof(from);
   spiffy_recvfrom(sock, buf, PACKETLEN, 0, (struct sockaddr *) &from, &fromlen);
   DPRINTF(DEBUG_SOCKETS, "Received UDP packet\n");
 
   memcpy(&pct, buf, sizeof(pct));
+  pct_standardize(&pct);
   int pct_type = pct.header.packet_type;
   switch (pct_type) {
     case WHOHAS_TYPE:
@@ -444,41 +455,32 @@ void process_inbound_udp(int sock, server_state_t *state) {
     default:
       DPRINTF(DEBUG_SOCKETS, "Packet type %d not understood.\n", pct_type);
   }
-} 
+}
 
-void dload_check_status(server_state_t *state) {                           
-    download_t *download = &state->download;                               
-    double time_passed = difftime(time(0), download->time_started);    
-    //int n = download->n_chunks;                                          
-    // Number of chunks waiting to download                                
-    //int w = download->n_chunks - download->n_in_progress;                  
-    //chunkd_t *chunks = download->chunks;                                 
-    /* Check if download is waiting for IHAVE responses and the timeout 
-     * has been surpassed. */         
-//    DPRINTF(DEBUG_DOWNLOAD, "dload_check_status: Checking if it's time to send a GET request\n");
-//    DPRINTF(DEBUG_DOWNLOAD, "dload_check_status: Download has status %d and %gs have passed since the last IHAVE\n", download->waiting_ihave, time_passed);                                    
-    if (download->waiting_ihave && (time_passed > TIME_WAIT_IHAVE)) {   
-      //  for (int i = 0; i < w; i++) {                                      
-            int rarest = dload_rarest_chunk(download);                     
-            chunkd_t *chunk = &download->chunks[rarest];                   
-            //bt_peer_t *peer = bt_peer_info(state->config, chunk->peer_list[0]);
-            // TODO: replace peer list with ids instead of addr            
-            // TODO: check if download in progress with given peer
-            if (chunk->pl_filled > 0) { 
-                data_packet_t pack;                                            
-                char *hash = id2hash(chunk->chunk_id,                          
-                    state->mcf_hashes, state->mcf_len);                        
-                pct_get(&pack, hash);                
-                // Choose peer
-                int peer = chunk->peer_list[0];    
-                chunk->peer = peer;                      
-                pct_send(&pack, peer_id_to_addr(peer, 
-                    state), state->sock);
-            }    
-            download->waiting_ihave = 0; // Stop waiting for IHAVE             
-       // }                                                               
-                                                                        
-    }                                                                   
+void check_download_status(server_state_t *state) {
+  if (dload_ihave_done(&state->download)) {
+    int chunk_indx = dload_pick_chunk(&state->download, state->peer_free);
+    if (chunk_indx >= 0) {
+      struct sockaddr_in *addr;
+      addr = peer_id_to_addr(state->download.chunks[chunk_indx].peer, state);
+      dload_chunk(&state->download, chunk_indx, addr, state->sock, state->peer_free);
+    } else {
+    /* Could not start a new downloading meaning either
+     * 1) There are currently no free peers (or peers with the chunk)
+     * 2) All download slots are full
+     * 3) User specified a chunk file with no chunks
+     * 4) WHOHAS packets were lost to certain peers
+     * 
+     * The solution to issues 1, 3, and 4 is thus to resend WHOHAS and wait 
+     * (possibly until peers become free or download slots open).
+     */
+      // Send WHOHAS for chunks that we still don't have
+      // Reset WHOHAS timer
+      // TODO: ADD implementation of the above, for now we want to stop
+      // the infinite loop that may occur
+      state->download.waiting_ihave = 0; // Stop waiting
+    }                             
+  }                                                
 }
 
 void handle_user_input(char *line, void *cbdata) {
@@ -493,9 +495,28 @@ void handle_user_input(char *line, void *cbdata) {
     }
   }
 }
+    
+/* 
+ * peer_free_init
+ * 
+ * Creates a sparse list of booleans to store whether user is currently 
+ * downloading a file from each peer (busy).  Free status is given by 1's and
+ * busy status is indicated by 0's.
+ */
+void peer_free_init(server_state_t *state) {
+  state->peer_free_size = get_largest_peer_id(state->config) + 1;
+  state->peer_free = malloc(sizeof(*state->peer_free) * state->peer_free_size);
+  memset(state->peer_free, PEER_FREE, state->peer_free_size);
+}
 
+/*
+ * server_state_init
+ * 
+ *  */
 void server_state_init(server_state_t *state, bt_config_t *config, 
   int sock) {
+  
+  DPRINTF(DEBUG_INIT, "server_state_init: Initializing server state\n");
 
   memset(state, 0, sizeof(*state));
   state->config = config;
@@ -505,6 +526,10 @@ void server_state_init(server_state_t *state, bt_config_t *config,
     &state->mcf_hashes, &state->mcf_ids, &state->dataf);
   state->hcf_len = chunkf_parse(config->has_chunk_file,
     &state->hcf_hashes, &state->hcf_ids);
+  peer_free_init(state);
+  state->n_peers = get_n_peers(config);
+
+  DPRINTF(DEBUG_INIT, "server_state_init: State initialied\n");
 }
 
 void peer_run(bt_config_t *config) {
@@ -547,8 +572,8 @@ void peer_run(bt_config_t *config) {
     FD_SET(STDIN_FILENO, &readfds);
     FD_SET(sock, &readfds);
 
-    dload_check_status(&state);
-    //check_retry_upl();
+    check_download_status(&state);
+    clear_mem(state, myaddr);
     
     nfds = select(sock+1, &readfds, NULL, NULL, &pct_timeout);
     

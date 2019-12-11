@@ -33,7 +33,8 @@ void make_packets(upload_t *upl, char* buf, int buf_size) {
         // Divide into packets
         for(int i = 0; i < listsize; i++) {
             char* mem_curr = buf + offs; 
-            pct_data(&packs[i], i, mem_curr, (i == listsize - 1) ? rem : DATALEN);                
+            pct_data(&packs[i], i + 1, mem_curr,
+                (i == (listsize - 1)) ? rem : DATALEN);         
             offs += DATALEN;
         }
         upl->chunk.packetlist = packs;
@@ -43,7 +44,7 @@ void make_packets(upload_t *upl, char* buf, int buf_size) {
 }
 
 // Function to read a chunk based on its specific ID from a file;
-void read_chunk(upload_t *upl, char *filename, char *buf) {
+void read_chunk(int id, char *filename, char *buf) {
     // Open chunkfile
     FILE *f;
     f = fopen(filename, "r");
@@ -52,7 +53,6 @@ void read_chunk(upload_t *upl, char *filename, char *buf) {
         exit(1);
     }
 
-    int id = upl->chunk.chunk_id;
     int position = id * BT_CHUNK_SIZE;
     int whence = SEEK_SET; // Offset bytes set to start of file
 
@@ -96,12 +96,17 @@ void check_retry_upl(upload_t *upl, int seq, server_state_t *state, struct socka
 }
 
 // Clear memory after upload is downloaded by the peer
-clear_mem(upload_t upl, server_state_t *state) {
-    //if(new_func) {}
-    data_packet_t packs = upl->chunk.packetlist;
-    int acks_count = upl->recv;
-    free(packs); // Free packetlist & acks count arr from upl struct after chunk downloaded
-    free(acks_count);
+void clear_mem(server_state_t *state, struct sockaddr_in from) {
+    int ind = get_relevant_upload(from, state);
+    // Ignore the ACK if we aren't processing an upload for the sender
+    if (ind == -1) {
+     return;
+    }
+    upload_t *upl = &state->uploads[ind];
+    if (dload_complete(upl->chunk)) { // Check if chunk download has compl
+        free(upl->chunk.packetlist;); // Free packetlist & acks count arr from upl struct after chunk downloaded
+        free(upl->recv;);
+    }
 }
 
 /* 
