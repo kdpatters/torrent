@@ -50,3 +50,4 @@ void pct_data(data_packet_t *packet, int seq_num, char *data, int len);
 void pct_ack(data_packet_t *packet, int ack_num);
 void pct_denied(data_packet_t *packet);
 void pct_send(data_packet_t *, struct sockaddr_in *, int);
+void pct_standardize(data_packet_t *);

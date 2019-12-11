@@ -416,12 +416,14 @@ void process_inbound_udp(int sock, server_state_t *state) {
   struct sockaddr_in from;
   socklen_t fromlen;
   char buf[PACKETLEN];
-
+  memset(buf, 0, sizeof(buf));
+    
   fromlen = sizeof(from);
   spiffy_recvfrom(sock, buf, PACKETLEN, 0, (struct sockaddr *) &from, &fromlen);
   DPRINTF(DEBUG_SOCKETS, "Received UDP packet\n");
 
   memcpy(&pct, buf, sizeof(pct));
+  pct_standardize(&pct);
   int pct_type = pct.header.packet_type;
   switch (pct_type) {
     case WHOHAS_TYPE:
