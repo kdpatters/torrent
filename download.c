@@ -18,6 +18,23 @@
 #define INVALID_FIELD 0
 
 /* 
+ * free_chunk
+ *
+ * Free arrays inside of a chunk.
+ */
+void free_chunk(chunkd_t *chk) {
+    DPRINTF(DEBUG_DOWNLOAD, "free_chunk: Freeing structs inside chunkd_t\n");
+    if (chk != NULL) {
+        if (chk->pl_size)
+            free(chk->peer_list);
+        if (chk->pieces_size) {
+            free(chk->pieces);
+            free(chk->pieces_filled);
+        }
+    }
+}
+
+/* 
  * dload_cumul_ack
  *
  * Returns the number to use to create a cumulative ACK for a given
@@ -62,6 +79,7 @@ void dload_assemble_chunk(chunkd_t *chk) {
 }
 
 void dload_store_data(chunkd_t *chk, data_packet_t pct) {
+  chk->last_data_recv = time(0);
   // Check if it is necessary to resize pieces array
   int seq_num = pct.header.seq_num - 1;
   if (chk->pieces_size <= seq_num) {
@@ -169,23 +187,6 @@ char dload_peer_add(download_t *download, int peer_id, int chunk_id) {
     }                                                                      
     return 0;                                                              
 }    
-
-/* 
- * free_chunk
- *
- * Free arrays inside of a chunk.
- */
-void free_chunk(chunkd_t *chk) {
-    DPRINTF(DEBUG_DOWNLOAD, "free_chunk: Freeing structs inside chunkd_t\n");
-    if (chk != NULL) {
-        if (chk->pl_size)
-            free(chk->peer_list);
-        if (chk->pieces_size) {
-            free(chk->pieces);
-            free(chk->pieces_filled);
-        }
-    }
-}
 
 /* 
  * dload_clear
@@ -322,6 +323,27 @@ void dload_chunk(download_t *download, int indx, struct sockaddr_in *addr,
   download->waiting_ihave = 0; // Stop waiting for IHAVE
   chk->state = DOWNLOADING;
   peer_free[chk->peer] = PEER_BUSY;
+}
+
+/* Returns index of chunk download if the peer responsible for that download has
+ * potentially disconneted. */
+int dload_check_discon(download_t *dwn, char *peer_free) {
+  for (int i = 0; i < dwn->n_chunks; i++) {
+    chunkd_t *chk = &dwn->chunks[i];
+    // Check if download has been interrupted
+    if ((chk->state == DOWNLOADING) && 
+        pct_peer_discon(chk->last_data_recv)) {
+        peer_free[chk->peer] = PEER_FREE;
+        int id = dload_pick_peer(dwn, peer_free, i);
+        if (id != -1) { // Set peer id
+          chk->peer = id;
+        }
+        chk->n_tries_get = 0;
+        memset(chk->pieces_filled, 0, chk->pieces_size);
+        return i;
+    }
+  }
+  return -1;
 }
 
 /* 

@@ -26,7 +26,6 @@
 #include "peer_list.h"
 
 #define PCT_TIMEOUT 500000 // Time in micro seconds to listen in SELECT
-#define DISC_THRESH 15 // Time in seconds to wait for a peer's next packet
 
 void peer_run(bt_config_t *config);
 
@@ -55,12 +54,6 @@ int main(int argc, char **argv) {
   
   peer_run(&config);
   return 0;
-}
-
-/* Returns a boolean based on a 'time_t' of the last packet received
- * from a peer whether the peer has likely closed the connection. */
-char peer_discon(time_t last_packet_recv) {
-    return difftime(time(0), last_packet_recv) > DISC_THRESH;
 }
 
 /* Returns the id for a peer based on its IP address and port. */

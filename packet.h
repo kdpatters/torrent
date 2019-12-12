@@ -27,6 +27,8 @@
 #define SPACELEFT (DATALEN - PADDING - CHK_COUNT)
 #define MAX_CHK_HASHES (SPACELEFT / CHK_HASH_BYTES)
 
+#define DISC_THRESH 15 // Time in seconds to wait for a peer's next packet
+
 typedef struct header_s {
   short magicnum;
   char version;
@@ -51,3 +53,4 @@ void pct_ack(data_packet_t *packet, int ack_num);
 void pct_denied(data_packet_t *packet);
 void pct_send(data_packet_t *, struct sockaddr_in *, int);
 void pct_standardize(data_packet_t *);
+char pct_peer_discon(time_t last_packet_recv);

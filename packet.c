@@ -12,6 +12,13 @@
 #include "bt_parse.h"
 #include "chunk.h"
 #include "debug.h"
+#include <time.h>
+
+/* Returns a boolean based on a 'time_t' of the last packet received
+ * from a peer whether the peer has likely closed the connection. */
+char pct_peer_discon(time_t last_packet_recv) {
+    return difftime(time(0), last_packet_recv) > DISC_THRESH;
+}
  
 /*
  * pct_standardize
