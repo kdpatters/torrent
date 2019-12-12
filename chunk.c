@@ -13,6 +13,44 @@
 #include "chunk.h"
 #include "debug.h"
 
+void write_chunk(int id, char *fname, char *buf) {
+  FILE *f = fopen(fname, "r+");
+  if (f == NULL) {
+    fprintf(stderr, "Problem opening file %s\n", fname);
+    exit(1);
+  }
+  int position = id * BT_CHUNK_SIZE;
+  int whence = SEEK_SET; // Offset bytes set to start of file
+  if (fseek(f, position, whence)) {
+      fprintf(stderr, "Could not read chunk %d\n", id);
+      exit(1);
+  }
+  fwrite(buf, BT_CHUNK_SIZE, 1, f); // Read a chunk
+  fclose(f);
+}
+
+// Function to read a chunk based on its specific ID from a file
+void read_chunk(int id, char *filename, char *buf) {
+    // Open chunkfile
+    FILE *f;
+    f = fopen(filename, "r");
+    if (f == NULL) {
+        fprintf(stderr, "Could not read file \"%s\".\n", filename);
+        exit(1);
+    }
+
+    int position = id * BT_CHUNK_SIZE;
+    int whence = SEEK_SET; // Offset bytes set to start of file
+
+    if (fseek(f, position, whence)) {
+        fprintf(stderr, "Could not read chunk %d\n", id);
+        exit(1);
+    }
+    // Position pointer to where chunk located indicated by buf_size
+    fread(buf, BT_CHUNK_SIZE, 1, f); // Read a chunk
+    fclose(f);
+}
+
 int helper_parse_chunkf(FILE *fp, char **hashes, int **ids) {
   DPRINTF(DEBUG_CHUNKS, "helper_parse_chunkf: Started\n");
   

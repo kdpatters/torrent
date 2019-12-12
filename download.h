@@ -77,6 +77,5 @@ char dload_complete(chunkd_t *chk);
 void dload_store_data(chunkd_t *chk, data_packet_t pct);
 void dload_assemble_chunk(chunkd_t *chk);
 char dload_verify_and_write_chunk(chunkd_t *chk, char *fname);
-void write_chunk(int id, char *fname, char *buf);
 int dload_cumul_ack(chunkd_t *chk);
 void dload_clear(download_t *);

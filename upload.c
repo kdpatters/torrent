@@ -15,10 +15,7 @@
 #include "debug.h"
 #include "input_buffer.h"
 
-
 // Test functions
-
-
 
 // Making packets after reading chunk
 void make_packets(upload_t *upl, char* buf, int buf_size) {
@@ -27,6 +24,7 @@ void make_packets(upload_t *upl, char* buf, int buf_size) {
     DPRINTF(DEBUG_UPLOAD, "make_packets: Total data %d bytes\nMax packet size \
 %d bytes\nLast packet %d bytes\n", buf_size, DATALEN, rem);
     int listsize = buf_size / DATALEN + !!rem;
+    DPRINTF(DEBUG_UPLOAD, "make_packets: Splitting chunk across %d packets\n", listsize);
     data_packet_t *packs = malloc(sizeof(*packs) * listsize); // Array of packets to be created
     int offs = 0;
 
@@ -39,35 +37,14 @@ void make_packets(upload_t *upl, char* buf, int buf_size) {
         }
         upl->chunk.packetlist = packs;
         upl->chunk.l_size = listsize;
+        DPRINTF(DEBUG_UPLOAD, "make_packets: Finished creating %d packets\n", listsize);
         int *received_acks =  malloc(sizeof(received_acks) * listsize); // Initiaize and allocate array for future acks to be received
         upl->recv = received_acks;
 }
 
-// Function to read a chunk based on its specific ID from a file;
-void read_chunk(int id, char *filename, char *buf) {
-    // Open chunkfile
-    FILE *f;
-    f = fopen(filename, "r");
-    if (f == NULL) {
-        fprintf(stderr, "Could not read file \"%s\".\n", filename);
-        exit(1);
-    }
-
-    int position = id * BT_CHUNK_SIZE;
-    int whence = SEEK_SET; // Offset bytes set to start of file
-
-    if (fseek(f, position, whence)) {
-        fprintf(stderr, "Could not read chunk %d\n", id);
-        exit(1);
-    }
-    // Position pointer to where chunk located indicated by buf_size
-    fread(buf, BT_CHUNK_SIZE, 1, f); // Read a chunk
-    fclose(f);
-}
-
 // Check if ack receieved is a duplicate that was rec before for another packet
-char check_dup_ack(upload_t *upl, int sequence, data_packet_t *ack) {
-    int n_acks = upl->rec[sequence];
+char check_dup_ack(upload_t *upl, int sequence) {
+    int n_acks = upl->recv[sequence];
     if(n_acks == MAX_DUP_ACK + 1)  // If current ack was already received before
         return 1;; // It is a duplicate
     
@@ -76,40 +53,38 @@ char check_dup_ack(upload_t *upl, int sequence, data_packet_t *ack) {
 
  
 // Check when the last data packet was received
-void check_retry_upl(upload_t *upl, int seq, int sock, struct sockaddr_in *dest) {
-    
-    double tdiff_last_ack = difftime((upl->send_times[seq], upl->last_ack_rec); 
+void handle_duplicate_ack(upload_t *upl, int seq, int sock, struct sockaddr_in *dest) {
+
+    double tdiff_last_ack = difftime(time(0), upl->chunk.last_ack_recv); 
 
     // Time-out occurs, or dup ack rec 3 times, incrementing recv array int from 2 -> 3 -> 4
-    if(((tdiff_last_ack > T_OUT_ACK) 
-    
-    
-    || check_dup_ack(upl, seq)) { 
-        data_packet_t resend_pac = upl->chunk.packetlist[seq];
+    if((tdiff_last_ack > T_OUT_ACK) || check_dup_ack(upl, seq)) { 
+        data_packet_t *resend_pac = &upl->chunk.packetlist[seq];
         pct_send(resend_pac, dest, sock); // in recv array 
-        DPRINTF(DEBUG_UPLOAD, "check_retry_upl: Re-sending lost packet %d\n", seq);
+        DPRINTF(DEBUG_UPLOAD, "handle_duplicate_ack: Re-sending lost packet %d\n", seq);
     }
     // Ack never seen before
-    else if(!check_dup_ack) {
-        data_packet_t send_next = upl->chunk.packetlist[seq + ACK_WINDOW_SZ]; // Get the next packet to send
+    else if(!check_dup_ack(upl, seq)) {
+        data_packet_t *send_next = &upl->chunk.packetlist[seq + ACK_WINDOW_SZ]; // Get the next packet to send
         pct_send(send_next, dest, sock); // Send the next data packet if ack rec is not seen before
-        DPRINTF(DEBUG_UPLOAD, "check_retry_upl: Sending next packet %d\n", seq + ACK_WINDOW_SZ);
+        DPRINTF(DEBUG_UPLOAD, "handle_duplicate_ack: Sending next packet %d\n", seq + ACK_WINDOW_SZ);
     }
 
 }
 
+void free_chunku(chunku_t *chk) {
+    free(chk->packetlist);
+}
 
-// Clear memory after last ack received
-void upload_clear(server_state_t *state, struct sockaddr_in from) {
-    int ind = get_relevant_upload(from, state);
-    if (ind == -1) {
-     return;
+// Clear memory after upload is downloaded by the peer
+void upload_clear(upload_t *upl, struct sockaddr_in from) {
+    if (upl->last_available == upl->chunk.l_size) { // Check if chunk upload has completed
+        // Acks count arr from upl struct and structs in 'chunku'
+        free_chunku(&upl->chunk);
+        free(upl->recv);
+
     }
-    upload_t *upl = &state->uploads[ind];
-    if () { // if last ACk received
-        free(upl->chunk.packetlist;); // Free packetlist & acks count arr from upl struct after chunk downloaded
-        free(upl->recv;);
-    }
+    memset(upl, 0, sizeof(*upl));
 }
 
 /* 

@@ -403,9 +403,11 @@ void process_ack(server_state_t *state, data_packet_t ack, struct sockaddr_in fr
     last_av, up->chunk.l_size);
   if (last_av < up->chunk.l_size) { // While index still within the packetlist
       struct sockaddr_in *peer_addr = peer_id_to_addr(up->peer_id, state); // Get peer address
-      pct_send(&up->chunk.packetlist[last_av++], peer_addr, state->sock);  // Send and update uploads struct last available data sent
+      handle_duplicate_ack(up, last_av, state->sock, peer_addr);
+      // pct_send(&up->chunk.packetlist[up->seq_num++], peer_addr, state->sock);  // Send and update uploads struct sequence number
   } else {
     DPRINTF(DEBUG_UPLOAD, "process_ack: Upload to peer %d completed\n", up->peer_id);
+    upload_clear(up, from);
   }
 }
 
@@ -573,7 +575,6 @@ void peer_run(bt_config_t *config) {
     FD_SET(sock, &readfds);
 
     check_download_status(&state);
-    upload_clear(state, myaddr);
     
     nfds = select(sock+1, &readfds, NULL, NULL, &pct_timeout);
     
