@@ -254,7 +254,9 @@ void process_get(server_state_t *state, data_packet_t pct, struct sockaddr_in fr
 
       for(int i = 0; i < ACK_WINDOW_SZ; i++) {
         pct_send(&upl->chunk.packetlist[i], &from, state->sock);  // Send first 8 packets
-        upl->next_pack_ind = ACK_WINDOW_SZ; // Set the next pct ind to be the window sz after first sending & increment from there 
+        time_t now = time(0);
+        upl->send_times[i] = now; // Storing time of each packet sent
+        upl->last_available = ACK_WINDOW_SZ; // Set the next pct ind to be the window sz after first sending & increment from there 
 
       } 
       upl->busy = BUSY; // Change upload status 
@@ -393,15 +395,15 @@ void process_ack(server_state_t *state, data_packet_t ack, struct sockaddr_in fr
   }
   DPRINTF(DEBUG_UPLOAD, "process_ack: Reading info about upload %d\n", ind);
   upload_t *up = &state->uploads[ind];
-  up->recv[ack.header.ack_num] += 1; // 1 - index into rec using ack_num to indicate ack for that packet received
+  up->recv[ack.header.ack_num -1] += 1; // 1 - index into recv using ack_num to indicate ack for that packet received
   // Store ACK in uploads struct
-  int next_seq = up->next_pack_ind;
+  int last_av = up->last_available;
   // Send the next data packet
   DPRINTF(DEBUG_UPLOAD, "process_ack: %d of %d packets sent\n",
-    up->next_seq, up->chunk.l_size);
-  if (up->next_seq < up->chunk.l_size) { // While index still within the packetlist
+    last_av, up->chunk.l_size);
+  if (last_av < up->chunk.l_size) { // While index still within the packetlist
       struct sockaddr_in *peer_addr = peer_id_to_addr(up->peer_id, state); // Get peer address
-      handle_duplicate_ack(up, next_seq, state, peer_addr);
+      handle_duplicate_ack(up, last_av, state->sock, peer_addr);
       // pct_send(&up->chunk.packetlist[up->seq_num++], peer_addr, state->sock);  // Send and update uploads struct sequence number
   } else {
     DPRINTF(DEBUG_UPLOAD, "process_ack: Upload to peer %d completed\n", up->peer_id);
