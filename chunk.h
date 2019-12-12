@@ -30,3 +30,5 @@ int hash2id(char *, char *, int *, int);
 int masterchunkf_parse(char *, char **, int **, char **);
 int chunkf_parse(char *, char **, int **);
 int verify_hash(uint8_t *str, int len, uint8_t *hash);
+void read_chunk(int id, char *filename, char *buf);
+void write_chunk(int id, char *fname, char *buf);
