@@ -227,12 +227,18 @@ void process_ihave(server_state_t *state, data_packet_t pct, struct sockaddr_in 
 
 // Returns the first index of an empty upload in upload array, otherwise -1
 int upload_first_empty(server_state_t *state) {
-  for (int i = 0; i < MAX_UPLOADS; i++) {
-      if(!state->uploads[i].busy) {
+  for (int i = 0; i < state->num_uploads; i++) {
+      if(!state->uploads[i].busy == NOT_BUSY) {
         return i;
       }
     }
     return -1; 
+}
+
+void send_denied(struct sockaddr_in to, int sock) {
+  data_packet_t pac;
+  pct_denied(&pac);
+  pct_send(&pac, &to, sock);  
 }
 
 void process_get(server_state_t *state, data_packet_t pct, struct sockaddr_in from) {
@@ -242,11 +248,19 @@ void process_get(server_state_t *state, data_packet_t pct, struct sockaddr_in fr
     int buf_size = BT_CHUNK_SIZE; // Chunk-length
     char buf[buf_size]; 
     int id = hash2id(pct.data, state->mcf_hashes, state->mcf_ids, state->mcf_len);   // Convert the hash to hex, then get its id
+    int peer_id = peer_addr_to_id(from, state);
+
+    // Check that we aren't uploading to this peer id already
+    for (int i = 0; i < state->num_uploads; i++) {
+      if (state->uploads[i].peer_id == peer_id) {
+        send_denied(from, state->sock);        
+      }
+    }
 
     // Check that chunk is in "has chunk file", 
     if ((up_emp != -1) && (id_in_ids(id, state->hcf_ids, state->hcf_len))) {
       upl = &state->uploads[up_emp];
-      upl->peer_id = peer_addr_to_id(from, state);
+      upl->peer_id = peer_id;
       upl->chunk.chunk_id = id;
       read_chunk(upl->chunk.chunk_id, state->dataf, buf); // Reads chunk from Data file in Master chunkfile
       make_packets(upl, buf, buf_size); // Split chunk into packets
@@ -268,9 +282,7 @@ void process_get(server_state_t *state, data_packet_t pct, struct sockaddr_in fr
     }
 
     else { // Otherwise send DENIED back
-      data_packet_t pac;
-      pct_denied(&pac);
-      pct_send(&pac, &from, state->sock);
+      send_denied(from, state->sock);
     }
 }
 
