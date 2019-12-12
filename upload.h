@@ -27,7 +27,6 @@ typedef struct chunku_s {
 
   // Chunk upload status
     int state;
-    int peer_id;
     int n_tries_send; // No. of tries before assuming packet lost
     //clock_t last_data_sent; 
     clock_t last_ack_recv;
@@ -44,10 +43,11 @@ typedef struct chunku_s {
     int *recv; // To keep count of packets sent for upload and recv
     int busy; // Busy -- 1, Not busy - 0  
     int next_pack_ind;
+    int peer_id;
+    int next_seq;
 } upload_t;
 
 void make_packets(upload_t *upl, char* buf, int buf_size);
-void read_chunk(upload_t *upl, char *filename, char *buf);
-void check_retry_upl(upload_t *upl, int seq, server_state_t *state, struct sockaddr_in *dest);
 char check_dup_ack(upload_t *upl, int sequence, data_packet_t *ack);
-void clear_mem(server_state_t *state, struct sockaddr_in from);
+void upload_clear(upload_t *upl, struct sockaddr_in from);
+void handle_duplicate_ack(upload_t *upl, int seq, int sock, struct sockaddr_in *dest);

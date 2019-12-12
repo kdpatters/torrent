@@ -17,22 +17,6 @@
 
 #define INVALID_FIELD 0
 
-void write_chunk(int id, char *fname, char *buf) {
-  FILE *f = fopen(fname, "r+");
-  if (f == NULL) {
-    fprintf(stderr, "Problem opening file %s\n", fname);
-    exit(1);
-  }
-  int position = id * BT_CHUNK_SIZE;
-  int whence = SEEK_SET; // Offset bytes set to start of file
-  if (fseek(f, position, whence)) {
-      fprintf(stderr, "Could not read chunk %d\n", id);
-      exit(1);
-  }
-  fwrite(buf, BT_CHUNK_SIZE, 1, f); // Read a chunk
-  fclose(f);
-}
-
 /* 
  * dload_cumul_ack
  *
