@@ -135,7 +135,7 @@ int dload_rarest_chunk(int *rarest, download_t *download) {
    
     // Copy struct indicies into "rarest" list
     for (int i = 0; i < filled; i++) {
-        rarest[i] = sorting[i].val;
+        rarest[i] = sorting[i].indx;
     }
     return filled;
 }
@@ -295,7 +295,9 @@ char dload_pick_chunk(download_t *download, char *peer_free) {
     int chunk_id = rarest[i];
     int peer_id = dload_pick_peer(download, peer_free, chunk_id);
 
-    DPRINTF(DEBUG_DOWNLOAD, "dload_pick_chunk: Testing whether peer id %d is valid\n", peer_id);
+    DPRINTF(DEBUG_DOWNLOAD, 
+      "dload_pick_chunk: Testing whether chunk %d and peer id %d is valid\n", 
+      chunk_id, peer_id);
     if (peer_id > 0) { // Found a suitable peer
       chks[chunk_id].peer = peer_id;
       return chunk_id;

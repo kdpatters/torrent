@@ -284,9 +284,12 @@ chunkd_t *find_relevant_download(server_state_t *state, struct sockaddr_in from)
   int peer_id = peer_addr_to_id(from, state); // Get sender's peer id
 
   for (int i = 0; i < state->download.n_chunks; i++) {
+
     // Look for the relevant chunk
     chunkd_t *chk = &state->download.chunks[i];
-    if (chk->peer == peer_id) {
+    //fprintf(stderr, "find_relevant_download: %d %d\n", chk->chunk_id, chk->state);
+    if ((chk->peer == peer_id) && (chk->state == DOWNLOADING)) {
+      DPRINTF(DEBUG_DOWNLOAD, "find_relevant_download: Found relevant download, slot %d\n", i);
       return chk;
     }
   }
@@ -359,8 +362,8 @@ void process_data(server_state_t *state, data_packet_t pct, struct sockaddr_in f
     return;
   }
 
-  DPRINTF(DEBUG_DOWNLOAD, "process_data: Received DATA from peer %d\n" , 
-    chk->peer);
+  DPRINTF(DEBUG_DOWNLOAD, "process_data: Received DATA from peer %d for chunk id %d\n" , 
+    chk->peer, chk->chunk_id);
   DPRINTF(DEBUG_DOWNLOAD, "process_data: Have received total of %d / %d bytes \
 so far for this chunk\n",
     chk->total_bytes, BT_CHUNK_SIZE);
