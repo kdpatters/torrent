@@ -559,7 +559,8 @@ void server_state_init(server_state_t *state, bt_config_t *config,
     &state->hcf_hashes, &state->hcf_ids);
   peer_free_init(state);
   state->n_peers = get_n_peers(config);
-  state->num_uploads = MAX_UPLOADS;
+  state->num_uploads = config->max_conn - 1;
+  state->uploads = malloc(sizeof(*state->uploads) * state->num_uploads);
 
   DPRINTF(DEBUG_INIT, "server_state_init: State initialied\n");
 }
