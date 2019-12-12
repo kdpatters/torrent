@@ -258,7 +258,6 @@ void process_get(server_state_t *state, data_packet_t pct, struct sockaddr_in fr
 
       } 
       upl->busy = BUSY; // Change upload status 
-      pct_send(&upl->chunk.packetlist[upl->seq_num++], &from, state->sock);  // Send first packet
     }
 
     else { // Otherwise send DENIED back
@@ -402,10 +401,11 @@ void process_ack(server_state_t *state, data_packet_t ack, struct sockaddr_in fr
     up->next_seq, up->chunk.l_size);
   if (up->next_seq < up->chunk.l_size) { // While index still within the packetlist
       struct sockaddr_in *peer_addr = peer_id_to_addr(up->peer_id, state); // Get peer address
-      check_retry_upl(up, next_seq, state, peer_addr);
+      handle_duplicate_ack(up, next_seq, state, peer_addr);
       // pct_send(&up->chunk.packetlist[up->seq_num++], peer_addr, state->sock);  // Send and update uploads struct sequence number
   } else {
     DPRINTF(DEBUG_UPLOAD, "process_ack: Upload to peer %d completed\n", up->peer_id);
+    upload_clear(up, from);
   }
 }
 
@@ -573,7 +573,6 @@ void peer_run(bt_config_t *config) {
     FD_SET(sock, &readfds);
 
     check_download_status(&state);
-    clear_mem(state, myaddr);
     
     nfds = select(sock+1, &readfds, NULL, NULL, &pct_timeout);
     
