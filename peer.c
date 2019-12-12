@@ -228,10 +228,12 @@ void process_ihave(server_state_t *state, data_packet_t pct, struct sockaddr_in 
 // Returns the first index of an empty upload in upload array, otherwise -1
 int upload_first_empty(server_state_t *state) {
   for (int i = 0; i < state->num_uploads; i++) {
-      if(!state->uploads[i].busy == NOT_BUSY) {
+      if (state->uploads[i].busy == NOT_BUSY) {
+        DPRINTF(DEBUG_UPLOAD, "upload_first_empty: Found empty slot at %d\n", i);
         return i;
       }
     }
+    DPRINTF(DEBUG_UPLOAD, "upload_first_empty: Did not find an empty slot.\n");
     return -1; 
 }
 
@@ -267,8 +269,8 @@ void process_get(server_state_t *state, data_packet_t pct, struct sockaddr_in fr
       upl->busy = BUSY; // Change upload status
 
       // Set the next pct ind to be the window sz after first sending & increment from there 
-      for (upl->last_available = 0; upl->last_available < ACK_WINDOW_SZ; 
-        upl->last_available++) {
+      upl->last_available = 0;
+      for (; upl->last_available < ACK_WINDOW_SZ; upl->last_available++) {
 
         DPRINTF(DEBUG_UPLOAD, "process_get: Sending packet of sequence number %d\n", 
           upl->last_available + 1);
@@ -280,7 +282,6 @@ void process_get(server_state_t *state, data_packet_t pct, struct sockaddr_in fr
       }
       upl->busy = BUSY; // Change upload status 
     }
-
     else { // Otherwise send DENIED back
       send_denied(from, state->sock);
     }
@@ -423,7 +424,7 @@ void process_ack(server_state_t *state, data_packet_t ack, struct sockaddr_in fr
   DPRINTF(DEBUG_UPLOAD, "process_ack: %d of %d packets sent\n",
     up->last_available, up->chunk.l_size);
   DPRINTF(DEBUG_UPLOAD, "process_ack: Received ack %d\n", ack.header.ack_num);
-  if (ack_num0 < up->chunk.l_size) { // While index still within the packetlist
+  if (ack_num0 < up->chunk.l_size - 1) { // While index still within the packetlist
       struct sockaddr_in *peer_addr = peer_id_to_addr(up->peer_id, state); // Get peer address
       handle_duplicate_ack(up, ack_num0, state->sock, peer_addr);
   } else {
@@ -551,6 +552,7 @@ void server_state_init(server_state_t *state, bt_config_t *config,
     &state->hcf_hashes, &state->hcf_ids);
   peer_free_init(state);
   state->n_peers = get_n_peers(config);
+  state->num_uploads = MAX_UPLOADS;
 
   DPRINTF(DEBUG_INIT, "server_state_init: State initialied\n");
 }
