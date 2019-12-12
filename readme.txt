@@ -10,6 +10,7 @@ packet of type X.  These functions call helpers from the following files
 
 chunk.c Chunk operations
 packet.c Packet creation, parsing
+peer_list.c Checking properties of a peer linked list (e.g. length)
 download.c Tracking and managing downloads, dealing with incoming data
 upload.c Tracking and managing uploads, dealing with outgoing data
 
@@ -29,5 +30,3 @@ but there appears to be an issue combining the chunks into a single
 file (which does not in any way match the input data file when I
 compared using VIMDIFF).  Likewise, I have not implemented any test
 code as of yet, although I have implemented extensive debug statements.
-
-Kyle
