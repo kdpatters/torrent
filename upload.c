@@ -76,34 +76,37 @@ char check_dup_ack(upload_t *upl, int sequence, data_packet_t *ack) {
 
  
 // Check when the last data packet was received
-void check_retry_upl(upload_t *upl, int seq, server_state_t *state, struct sockaddr_in *dest) {
-
-    double tdiff_last_ack = difftime(time(0), upl->last_ack_rec); 
+void check_retry_upl(upload_t *upl, int seq, int sock, struct sockaddr_in *dest) {
+    
+    double tdiff_last_ack = difftime((upl->send_times[seq], upl->last_ack_rec); 
 
     // Time-out occurs, or dup ack rec 3 times, incrementing recv array int from 2 -> 3 -> 4
-    if(((tdiff_last_ack > T_OUT_ACK) || check_dup_ack(upl, seq)) { 
+    if(((tdiff_last_ack > T_OUT_ACK) 
+    
+    
+    || check_dup_ack(upl, seq)) { 
         data_packet_t resend_pac = upl->chunk.packetlist[seq];
-        pct_send(resend_pac, dest, state->sock); // in recv array 
+        pct_send(resend_pac, dest, sock); // in recv array 
         DPRINTF(DEBUG_UPLOAD, "check_retry_upl: Re-sending lost packet %d\n", seq);
     }
     // Ack never seen before
     else if(!check_dup_ack) {
         data_packet_t send_next = upl->chunk.packetlist[seq + ACK_WINDOW_SZ]; // Get the next packet to send
-        pct_send(send_next, dest, state->sock); // Send the next data packet if ack rec is not seen before
+        pct_send(send_next, dest, sock); // Send the next data packet if ack rec is not seen before
         DPRINTF(DEBUG_UPLOAD, "check_retry_upl: Sending next packet %d\n", seq + ACK_WINDOW_SZ);
     }
 
 }
 
-// Clear memory after upload is downloaded by the peer
-void clear_mem(server_state_t *state, struct sockaddr_in from) {
+
+// Clear memory after last ack received
+void upload_clear(server_state_t *state, struct sockaddr_in from) {
     int ind = get_relevant_upload(from, state);
-    // Ignore the ACK if we aren't processing an upload for the sender
     if (ind == -1) {
      return;
     }
     upload_t *upl = &state->uploads[ind];
-    if (dload_complete(upl->chunk)) { // Check if chunk download has compl
+    if () { // if last ACk received
         free(upl->chunk.packetlist;); // Free packetlist & acks count arr from upl struct after chunk downloaded
         free(upl->recv;);
     }

@@ -29,8 +29,7 @@ typedef struct chunku_s {
     int state;
     int peer_id;
     int n_tries_send; // No. of tries before assuming packet lost
-    //clock_t last_data_sent; 
-    clock_t last_ack_recv;
+    time_t last_ack_recv;
   
   // Data
     char data[BT_CHUNK_SIZE]; // Space reserved for entire chunk
@@ -40,10 +39,10 @@ typedef struct chunku_s {
 
  typedef struct upload {
     chunku_t chunk;// Chunk to upload 
-    clock_t t_start_send;
     int *recv; // To keep count of packets sent for upload and recv
-    int busy; // Busy -- 1, Not busy - 0  
-    int next_pack_ind;
+    int busy; // Busy -- 1, Not busy - 0
+    time_t send_times[8]; // Store time when each packet sent 
+    int last_available; // Index to next packet to send
 } upload_t;
 
 void make_packets(upload_t *upl, char* buf, int buf_size);
