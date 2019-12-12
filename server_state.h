@@ -1,6 +1,6 @@
 typedef struct server_state_s {
     download_t download;
-    upload_t *uploads;
+    upload_t uploads[MAX_UPLOADS];
     bt_config_t *config;
     int num_uploads;
     int num_downloads;

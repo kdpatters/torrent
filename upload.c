@@ -38,36 +38,39 @@ void make_packets(upload_t *upl, char* buf, int buf_size) {
         upl->chunk.packetlist = packs;
         upl->chunk.l_size = listsize;
         DPRINTF(DEBUG_UPLOAD, "make_packets: Finished creating %d packets\n", listsize);
-        int *received_acks =  malloc(sizeof(received_acks) * listsize); // Initiaize and allocate array for future acks to be received
-        upl->recv = received_acks;
+        // Initiaize and allocate array for future acks to be received
+        upl->recv = malloc(sizeof(*upl->recv) * listsize);
+        memset(upl->recv, 0, sizeof(*upl->recv) * listsize);
 }
 
 // Check if ack receieved is a duplicate that was rec before for another packet
 char check_dup_ack(upload_t *upl, int sequence) {
-    int n_acks = upl->recv[sequence];
-    if(n_acks == MAX_DUP_ACK + 1)  // If current ack was already received before
-        return 1;; // It is a duplicate
-    
-    return -1; // Otherwise not a dup
+    return upl->recv[sequence] > 1;
 }
 
+char should_resend_data(upload_t *upl, int sequence) {
+    return upl->recv[sequence] >= MAX_DUP_ACK;
+}
  
 // Check when the last data packet was received
 void handle_duplicate_ack(upload_t *upl, int seq, int sock, struct sockaddr_in *dest) {
 
-    double tdiff_last_ack = difftime(time(0), upl->chunk.last_ack_recv); 
+    //double tdiff_last_ack = difftime(time(0), upl->chunk.last_ack_recv); 
+    //(tdiff_last_ack > T_OUT_ACK) || 
 
     // Time-out occurs, or dup ack rec 3 times, incrementing recv array int from 2 -> 3 -> 4
-    if((tdiff_last_ack > T_OUT_ACK) || check_dup_ack(upl, seq)) { 
-        data_packet_t *resend_pac = &upl->chunk.packetlist[seq];
-        pct_send(resend_pac, dest, sock); // in recv array 
-        DPRINTF(DEBUG_UPLOAD, "handle_duplicate_ack: Re-sending lost packet %d\n", seq);
+    if(check_dup_ack(upl, seq)) {
+        if (should_resend_data(upl, seq)) { 
+            data_packet_t *resend_pac = &upl->chunk.packetlist[seq];
+            pct_send(resend_pac, dest, sock); // in recv array 
+            DPRINTF(DEBUG_UPLOAD, "handle_duplicate_ack: Re-sending lost packet %d\n", seq + 1);
+        }
     }
     // Ack never seen before
-    else if(!check_dup_ack(upl, seq)) {
-        data_packet_t *send_next = &upl->chunk.packetlist[seq + ACK_WINDOW_SZ]; // Get the next packet to send
+    else if (upl->last_available < upl->chunk.l_size) {
+        data_packet_t *send_next = &upl->chunk.packetlist[upl->last_available++]; // Get the next packet to send
         pct_send(send_next, dest, sock); // Send the next data packet if ack rec is not seen before
-        DPRINTF(DEBUG_UPLOAD, "handle_duplicate_ack: Sending next packet %d\n", seq + ACK_WINDOW_SZ);
+        DPRINTF(DEBUG_UPLOAD, "handle_duplicate_ack: Sending next packet %d\n", upl->last_available);
     }
 
 }
