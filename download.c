@@ -104,7 +104,6 @@ void dload_store_data(chunkd_t *chk, data_packet_t pct) {
   else {
     DPRINTF(DEBUG_DOWNLOAD, "dload_store_data: Received duplicate of packet \
 sequence no. %d\n", seq_num);
-    exit(0);
   }
 
   // Store information about last_data_recv
@@ -252,6 +251,20 @@ char dload_ihave_done(download_t *download) {
 }
 
 /* 
+ * dload_stalled
+ * 
+ * Returns boolean for whether download has stopped making progress and
+ * should be ended as it is stalled. 
+ * */
+// char dload_stalled(download_t *download) {
+//   double time_passed = difftime(time(0), download->time_started); 
+//   if (time_passed > )
+//   for (int i = 0; i < download->n_chunks; i++) {
+//     if 
+//   }
+// }
+
+/* 
  * dload_pick_peer
  * 
  * Given a specific index to the chunk array in 'download' struct, returns the
@@ -325,6 +338,12 @@ void dload_chunk(download_t *download, int indx, struct sockaddr_in *addr,
   peer_free[chk->peer] = PEER_BUSY;
 }
 
+void dload_reset_chunk_peer(chunkd_t *chk) {
+  chk->peer = 0;
+  chk->n_tries_get = 0;
+  memset(chk->pieces_filled, 0, chk->pieces_size);
+}
+
 /* Returns index of chunk download if the peer responsible for that download has
  * potentially disconneted. */
 int dload_check_discon(download_t *dwn, char *peer_free) {
@@ -334,12 +353,11 @@ int dload_check_discon(download_t *dwn, char *peer_free) {
     if ((chk->state == DOWNLOADING) && 
         pct_peer_discon(chk->last_data_recv)) {
         peer_free[chk->peer] = PEER_FREE;
+        dload_reset_chunk_peer(chk);
         int id = dload_pick_peer(dwn, peer_free, i);
         if (id != -1) { // Set peer id
           chk->peer = id;
         }
-        chk->n_tries_get = 0;
-        memset(chk->pieces_filled, 0, chk->pieces_size);
         return i;
     }
   }
@@ -351,18 +369,49 @@ int dload_check_discon(download_t *dwn, char *peer_free) {
  * 
  * Check that client has not already begun to download the given chunk. 
  */
-//char can_download(download_t *download) {
-//   return downloads->n < MAX_DOWNLOADS;
-// }
+char can_download(download_t *download, int num_uploads, int num_downloads, 
+  int max_conn) {
+  return (num_uploads + num_downloads) < max_conn;
+}
 
 /*
- * ready_download
+ * check_retry_get
  * 
- * Initialize the download.
+ * Check timeout for when last data packet received and last get sent have been 
+ * exceeded.  If less than the maximum number of gets have been sent, then 
+ * resend another get.  Otherwise, 
  */
-// void ready_download(download_t download) {
-//     memset(&download, 0, sizeof(download));
-// }
+void check_retry_get(chunkd_t chunkd, char *peer_free, clock_t now) {
+    /* 
+     * Check if timeouts for when last get was sent and last data packet was 
+     * received have been exceeded.
+     */
+    // Check when the last data packet was received
+    // Either attempt to verify chunk, stop download entirely (if max retries 
+    // exceeded), or send another GET
+    if ((now - chunkd.last_get_sent > GET_WINDOW) &&
+        (chunkd.recv_first_data)) {
+        if (chunkd.n_tries_get < MAX_RETRIES_GET) {
+            // TODO
+            //send_get(...);
+        }
+        else {
+            /* Try to finish by downloading the chunk from a different peer. */
+            // TODO
+        }
+    }
+
+}
+
+void check_chunk_downloads(download_t *download, char *peer_free) {
+    clock_t now = clock();
+
+    for (int i = 0; i < download->n_chunks; i++) {
+        if (download->chunks[i].state == DOWNLOADING) {
+            check_retry_get(download->chunks[i], peer_free, now);
+        }
+    }
+}
 
 // /* 
 //  * download_next_chunk
@@ -379,42 +428,5 @@ int dload_check_discon(download_t *dwn, char *peer_free) {
 //         }
 //     }
 //     return i;
-// }
-
-// /*
-//  * check_retry_get
-//  * 
-//  * Check timeout for when last data packet received and last get sent have been 
-//  * exceeded.  If less than the maximum number of gets have been sent, then 
-//  * resend another get.  Otherwise, 
-//  */
-// void check_retry_get(chunkd_t chunkd, clock_t now) {
-//     /* 
-//      * Check if timeouts for when last get was sent and last data packet was 
-//      * received have been exceeded.
-//      */
-//     if ((now - chunkd.last_get_sent > GET_WINDOW) &&
-//         (now - chunkd.last_data_recv > DATA_WINDOW)) {
-//         if (chunkd.n_tries_get < MAX_RETRIES_GET) {
-//             // TODO
-//             //send_get(...);
-//         }
-//         else {
-//             /* Try to finish by downloading the chunk from a different peer. */
-//             // TODO
-//         }
-//     }
-//     // Check when the last data packet was received
-//     // Either attempt to verify chunk, stop download entirely (if max retries exceeded), or send another GET
-// }
-
-// void check_chunk_downloads(download_t *download) {
-//     clock_t now = clock();
-
-//     for (int i = 0; i < download->n_chunks; i++) {
-//         if (download->chunks[i].state == WAIT_DATA) {
-//             check_retry_get(download->chunks[i], now);
-//         }
-//     }
 // }
 

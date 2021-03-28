@@ -243,6 +243,12 @@ void send_denied(struct sockaddr_in to, int sock) {
   pct_send(&pac, &to, sock);  
 }
 
+void send_get(struct sockaddr_in to, int sock, char *hash) {
+  data_packet_t pack;                                                                    
+  pct_get(&pack, hash);                          
+  pct_send(&pack, &to, sock);
+}
+
 void process_get(server_state_t *state, data_packet_t pct, struct sockaddr_in from) {
     upload_t *upl;
     int up_emp = upload_first_empty(state);

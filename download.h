@@ -41,6 +41,7 @@ typedef struct chunkd_s {
   int state;
   int peer;
   int n_tries_get;
+  int recv_first_data;
   time_t last_get_sent;
   time_t last_data_recv;
   
@@ -59,6 +60,7 @@ typedef struct download_s {
   int waiting_ihave;
   int n_ihave_waiting; // Number of IHAVE responses waiting for
   int n_ihave_recv; // Number of IHAVE responses received
+  time_t last_update;
 
   // Chunk info
   int n_chunks;
