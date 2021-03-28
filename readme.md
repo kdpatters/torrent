@@ -33,13 +33,13 @@ headers.  Finally, our code has extensive debug statements (which
 can lean to the verbose side).
 
 TODO:
--Handle abrupt disconnects (e.g. no more data packets, no more acks)
-    -Retransmit GET (if no response within timeout)
-    -Picking a different peer (or removing the first from the peer list
+- Handle abrupt disconnects (e.g. no more data packets, no more acks)
+    - Retransmit GET (if no response within timeout)
+    - Picking a different peer (or removing the first from the peer list
         if the first peer has crashed) so it is not chosen again
--Handle dropped data packets using timeout
--Handle stalled downloads using timeout
--Handle stalled uploads using timeout
--Implement concurrency for downloads
-    -Allow flexible numbers of downloads and uploads instead of fixed
--Implement congestion control
+- Handle dropped data packets using timeout
+- Handle stalled downloads using timeout
+- Handle stalled uploads using timeout
+- Implement concurrency for downloads
+    - Allow flexible numbers of downloads and uploads instead of fixed
+- Implement congestion control
