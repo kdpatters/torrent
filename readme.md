@@ -1,5 +1,5 @@
 # Torrent
-This project consists of a simple low-level implementation of peer to peer file sharing over UDP.  This code was initially created as a CMPU375 (Networks) project as Vassar College by Kyle Patterson and Tahsin Oshin.
+This project consists of a simple low-level implementation of peer to peer file sharing over UDP.  This code was initially created as a CMPU375 (Networks) project as Vassar College by Kyle Patterson and Tahsin Oshin.  The starter code referenced in the first commit was provided by Professor Rui Meireles for CMPU375 at Vassar College.
 
 We added onto the process UDP function from the starter code to call
 the respective functions for each packet type.  It currently assumes
